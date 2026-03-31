@@ -7,6 +7,7 @@ import { EnvironmentService } from '../../services/EnvironmentService'
 import { ContextMenu, type ContextMenuItem } from '../reusable/ContextMenu'
 import { Modal } from '../reusable/Modal'
 import { SearchInput } from '../reusable/SearchInput'
+import { useTabs } from '../../contexts/TabContext'
 import type { Collection, Request, Environment } from '../../types'
 
 const METHOD_COLORS: Record<string, string> = {
@@ -44,6 +45,12 @@ interface EndpointsPanelProps {
 export function EndpointsPanel({ companyId }: EndpointsPanelProps): React.JSX.Element {
   const navigate = useNavigate()
   const { requestId: selectedRequestId } = useParams()
+  const { openTab, activeTabId } = useTabs()
+
+  function selectRequest(req: Request): void {
+    openTab({ id: req.id, name: req.name, method: req.method || 'GET' })
+    navigate(`/endpoints/${req.id}`)
+  }
   const [collections, setCollections] = useState<Collection[]>([])
   const [requests, setRequests] = useState<Request[]>([])
   const [environments, setEnvironments] = useState<Map<string, Environment>>(new Map())
@@ -215,7 +222,7 @@ export function EndpointsPanel({ companyId }: EndpointsPanelProps): React.JSX.El
     })
     setExpandedIds((prev) => new Set(prev).add(collectionId))
     await load()
-    navigate(`/endpoints/${newReq.id}`)
+    selectRequest(newReq)
   }
 
   function getContextMenuItems(): ContextMenuItem[] {
@@ -276,8 +283,8 @@ export function EndpointsPanel({ companyId }: EndpointsPanelProps): React.JSX.El
               onRequestContextMenu={handleRequestContextMenu}
               getChildCollections={getChildCollections}
               getCollectionRequests={getCollectionRequests}
-              onSelectRequest={(req) => navigate(`/endpoints/${req.id}`)}
-              selectedRequestId={selectedRequestId ?? null}
+              onSelectRequest={selectRequest}
+              selectedRequestId={activeTabId ?? selectedRequestId ?? null}
               environments={environments}
               renaming={renaming}
               onRenameChange={(value) => setRenaming((prev) => (prev ? { ...prev, value } : null))}

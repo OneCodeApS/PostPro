@@ -1,55 +1,14 @@
-import { useRef, useEffect, useState } from 'react'
 import { HashRouter, Routes, Route, Navigate, Outlet } from 'react-router-dom'
 import { AuthProvider, useAuth } from './contexts/AuthContext'
+import { TabProvider, useTabs } from './contexts/TabContext'
 import { Sidebar } from './components/Sidebar'
+import { TitleBar } from './components/TitleBar'
+import { TabBar } from './components/endpoints/TabBar'
 import { EndpointsPanel } from './components/endpoints/EndpointsPanel'
 import { RequestDetail } from './components/endpoints/RequestDetail'
 import { EnvironmentsPanel } from './components/environments/EnvironmentsPanel'
 import { EnvironmentDetail } from './components/environments/EnvironmentDetail'
 import { DetailPanel } from './components/DetailPanel'
-
-function UserMenu(): React.JSX.Element {
-  const { user, signOut } = useAuth()
-  const [open, setOpen] = useState(false)
-  const menuRef = useRef<HTMLDivElement>(null)
-
-  useEffect(() => {
-    function handleClickOutside(e: MouseEvent): void {
-      if (menuRef.current && !menuRef.current.contains(e.target as Node)) {
-        setOpen(false)
-      }
-    }
-    document.addEventListener('mousedown', handleClickOutside)
-    return () => document.removeEventListener('mousedown', handleClickOutside)
-  }, [])
-
-  const initials = user?.email ? user.email.substring(0, 2).toUpperCase() : '?'
-
-  return (
-    <div className="relative" ref={menuRef}>
-      <button
-        onClick={() => setOpen(!open)}
-        className="flex h-9 w-9 items-center justify-center rounded-full bg-white/20 text-sm font-semibold text-white transition-colors hover:bg-white/30"
-      >
-        {initials}
-      </button>
-      {open && (
-        <div className="absolute right-0 mt-2 w-56 rounded-lg bg-white py-2 shadow-lg z-50">
-          <div className="border-b border-gray-100 px-4 py-2">
-            <p className="text-xs text-gray-500">Signed in as</p>
-            <p className="truncate text-sm font-medium text-gray-900">{user?.email}</p>
-          </div>
-          <button
-            onClick={signOut}
-            className="w-full px-4 py-2 text-left text-sm text-gray-700 transition-colors hover:bg-gray-100"
-          >
-            Sign out
-          </button>
-        </div>
-      )}
-    </div>
-  )
-}
 
 function LoginPage(): React.JSX.Element {
   const { signInWithMicrosoft } = useAuth()
@@ -74,6 +33,7 @@ function LoginPage(): React.JSX.Element {
 
 function EndpointsRoute(): React.JSX.Element {
   const { companyId } = useAuth()
+  const { tabs, activeTabId } = useTabs()
 
   if (!companyId) return <NoCompany />
 
@@ -82,8 +42,22 @@ function EndpointsRoute(): React.JSX.Element {
       <div className="w-64 shrink-0 border-r border-white/10 overflow-hidden">
         <EndpointsPanel companyId={companyId} />
       </div>
-      <div className="flex-1 overflow-hidden">
-        <Outlet />
+      <div className="flex flex-1 flex-col overflow-hidden">
+        <TabBar />
+        <div className="relative flex-1 overflow-hidden">
+          {tabs.length === 0 && (
+            <DetailPanel selectedEnvironment={null} selectedRequest={null} />
+          )}
+          {tabs.map((tab) => (
+            <div
+              key={tab.id}
+              className="absolute inset-0"
+              style={{ display: tab.id === activeTabId ? 'block' : 'none' }}
+            >
+              <RequestDetail requestId={tab.id} />
+            </div>
+          ))}
+        </div>
       </div>
     </>
   )
@@ -117,10 +91,7 @@ function NoCompany(): React.JSX.Element {
 function AppLayout(): React.JSX.Element {
   return (
     <div className="flex h-screen flex-col">
-      <div className="flex items-center justify-between border-b border-white/10 px-4 py-2 bg-op-primary">
-        <h1 className="text-lg font-bold text-white">PostPro</h1>
-        <UserMenu />
-      </div>
+      <TitleBar />
       <div className="flex flex-1 overflow-hidden">
         <Sidebar />
         <Outlet />
@@ -145,13 +116,8 @@ function AppContent(): React.JSX.Element {
   return (
     <Routes>
       <Route element={<AppLayout />}>
-        <Route path="/endpoints" element={<EndpointsRoute />}>
-          <Route
-            index
-            element={<DetailPanel selectedEnvironment={null} selectedRequest={null} />}
-          />
-          <Route path=":requestId" element={<RequestDetail />} />
-        </Route>
+        <Route path="/endpoints" element={<EndpointsRoute />} />
+        <Route path="/endpoints/:requestId" element={<EndpointsRoute />} />
         <Route path="/environments" element={<EnvironmentsRoute />}>
           <Route
             index
@@ -169,7 +135,9 @@ function App(): React.JSX.Element {
   return (
     <HashRouter>
       <AuthProvider>
-        <AppContent />
+        <TabProvider>
+          <AppContent />
+        </TabProvider>
       </AuthProvider>
     </HashRouter>
   )

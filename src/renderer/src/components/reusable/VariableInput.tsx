@@ -13,6 +13,102 @@ interface VariableInputProps {
   variables: Variable[]
   placeholder?: string
   className?: string
+  multiline?: boolean
+  syntax?: 'json'
+}
+
+function escapeHtml(text: string): string {
+  return text.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;')
+}
+
+function highlightVariables(text: string): string {
+  const escaped = escapeHtml(text)
+  return escaped
+    .replace(
+      /\{(\w+)\}/g,
+      '<span class="rounded px-0.5 bg-op-tertiary/20 font-bold text-op-tertiary">{$1}</span>'
+    )
+}
+
+function highlightJson(text: string): string {
+  // Tokenize JSON with a single regex that matches tokens in order
+  const token =
+    /(\{(\w+)\})|("(?:[^"\\]|\\.)*")\s*(?=:)|("(?:[^"\\]|\\.)*")|\b(-?\d+(?:\.\d+)?(?:[eE][+-]?\d+)?)\b|\b(true|false|null)\b|([{}[\]:,])|(\n)|(.)/g
+
+  let result = ''
+  let m: RegExpExecArray | null
+  while ((m = token.exec(text)) !== null) {
+    if (m[1]) {
+      // Variable {word}
+      result += `<span class="rounded px-0.5 bg-op-tertiary/20 font-bold text-op-tertiary">${escapeHtml(m[1])}</span>`
+    } else if (m[3]) {
+      // JSON key (string followed by colon)
+      result += `<span class="text-blue-400">${escapeHtml(m[3])}</span>`
+    } else if (m[4]) {
+      // JSON string value
+      result += `<span class="text-green-400">${escapeHtml(m[4])}</span>`
+    } else if (m[5]) {
+      // Number
+      result += `<span class="text-orange-400">${escapeHtml(m[5])}</span>`
+    } else if (m[6]) {
+      // Boolean / null
+      result += `<span class="text-purple-400">${escapeHtml(m[6])}</span>`
+    } else if (m[7]) {
+      // Punctuation
+      result += `<span class="text-white/40">${escapeHtml(m[7])}</span>`
+    } else if (m[8]) {
+      // Newline
+      result += '\n'
+    } else {
+      // Whitespace or other
+      result += escapeHtml(m[0])
+    }
+  }
+  return result
+}
+
+function getCaretOffset(el: HTMLElement): number {
+  const sel = window.getSelection()
+  if (!sel || sel.rangeCount === 0) return 0
+  const range = sel.getRangeAt(0).cloneRange()
+  range.selectNodeContents(el)
+  range.setEnd(sel.getRangeAt(0).endContainer, sel.getRangeAt(0).endOffset)
+  return range.toString().length
+}
+
+function setCaretOffset(el: HTMLElement, offset: number): void {
+  const sel = window.getSelection()
+  if (!sel) return
+
+  let remaining = offset
+
+  function walk(node: Node): boolean {
+    if (node.nodeType === Node.TEXT_NODE) {
+      const len = node.textContent?.length ?? 0
+      if (remaining <= len) {
+        const range = document.createRange()
+        range.setStart(node, remaining)
+        range.collapse(true)
+        sel!.removeAllRanges()
+        sel!.addRange(range)
+        return true
+      }
+      remaining -= len
+    } else {
+      for (const child of node.childNodes) {
+        if (walk(child)) return true
+      }
+    }
+    return false
+  }
+
+  if (!walk(el)) {
+    const range = document.createRange()
+    range.selectNodeContents(el)
+    range.collapse(false)
+    sel.removeAllRanges()
+    sel.addRange(range)
+  }
 }
 
 export function VariableInput({
@@ -20,11 +116,19 @@ export function VariableInput({
   onChange,
   variables,
   placeholder,
-  className = ''
+  className = '',
+  multiline = false,
+  syntax
 }: VariableInputProps): React.JSX.Element {
-  const inputRef = useRef<HTMLInputElement>(null)
+  const highlight = syntax === 'json' ? highlightJson : highlightVariables
+
+  const editorRef = useRef<HTMLDivElement>(null)
   const [dropdown, setDropdown] = useState<{ query: string; rect: DOMRect } | null>(null)
   const [highlightedIndex, setHighlightedIndex] = useState(0)
+  const caretRef = useRef<number>(0)
+  const isComposing = useRef(false)
+  const skipNextInput = useRef(false)
+  const internalValue = useRef(value)
 
   useEffect(() => {
     if (!dropdown) return
@@ -33,12 +137,40 @@ export function VariableInput({
     return () => window.removeEventListener('scroll', close, true)
   }, [dropdown])
 
-  function handleChange(e: React.ChangeEvent<HTMLInputElement>): void {
-    onChange(e.target.value)
-    const cursorPos = e.target.selectionStart ?? e.target.value.length
-    const match = e.target.value.slice(0, cursorPos).match(/\{([^}]*)$/)
-    if (match && inputRef.current) {
-      setDropdown({ query: match[1], rect: inputRef.current.getBoundingClientRect() })
+  // Highlight on mount and when value changes externally (e.g. loading different request, format button)
+  useEffect(() => {
+    const el = editorRef.current
+    if (!el) return
+    if (value === internalValue.current && el.innerHTML) return
+    internalValue.current = value
+    el.innerHTML = value ? highlight(value) : ''
+  }, [value])
+
+  function applyHighlight(text: string, caret: number): void {
+    const el = editorRef.current
+    if (!el) return
+    el.innerHTML = text ? highlight(text) : ''
+    setCaretOffset(el, caret)
+  }
+
+  function handleInput(): void {
+    if (skipNextInput.current) { skipNextInput.current = false; return }
+    if (isComposing.current) return
+    const el = editorRef.current
+    if (!el) return
+    const text = (el.textContent ?? '')
+    const caret = getCaretOffset(el)
+    caretRef.current = caret
+    internalValue.current = text
+    onChange(text)
+
+    // Re-highlight and restore caret inline
+    applyHighlight(text, caret)
+
+    // Check for variable dropdown trigger
+    const match = text.slice(0, caret).match(/\{(\w*)$/)
+    if (match) {
+      setDropdown({ query: match[1], rect: el.getBoundingClientRect() })
       setHighlightedIndex(0)
     } else {
       setDropdown(null)
@@ -46,20 +178,26 @@ export function VariableInput({
   }
 
   function insertVar(key: string): void {
-    const input = inputRef.current
-    if (!input) return
-    const cursorPos = input.selectionStart ?? value.length
-    const match = value.slice(0, cursorPos).match(/\{([^}]*)$/)
+    const el = editorRef.current
+    if (!el) return
+    const text = (el.textContent ?? '')
+    const cursorPos = caretRef.current
+    const match = text.slice(0, cursorPos).match(/\{(\w*)$/)
     if (!match) return
     const start = cursorPos - match[0].length
-    const end = value.slice(cursorPos).startsWith('}') ? cursorPos + 1 : cursorPos
-    const newVal = value.slice(0, start) + `{${key}}` + value.slice(end)
+    const end = text.slice(cursorPos).startsWith('}') ? cursorPos + 1 : cursorPos
+    const newVal = text.slice(0, start) + `{${key}}` + text.slice(end)
     onChange(newVal)
     setDropdown(null)
-    setTimeout(() => {
-      input.setSelectionRange(start + key.length + 2, start + key.length + 2)
-      input.focus()
-    }, 0)
+    const newCaret = start + key.length + 2
+    caretRef.current = newCaret
+    requestAnimationFrame(() => {
+      if (editorRef.current) {
+        editorRef.current.innerHTML = highlight(newVal)
+        setCaretOffset(editorRef.current, newCaret)
+        editorRef.current.focus()
+      }
+    })
   }
 
   const dropdownMatches =
@@ -69,7 +207,31 @@ export function VariableInput({
         )
       : []
 
-  function handleKeyDown(e: React.KeyboardEvent<HTMLInputElement>): void {
+  function handleKeyDown(e: React.KeyboardEvent<HTMLDivElement>): void {
+    if (e.key === 'Enter') {
+      if (dropdown && dropdownMatches.length > 0) {
+        e.preventDefault()
+        insertVar(dropdownMatches[highlightedIndex].key)
+        return
+      }
+      if (multiline) {
+        e.preventDefault()
+        skipNextInput.current = true
+        const el = editorRef.current
+        if (!el) return
+        const text = (el.textContent ?? '')
+        const caret = getCaretOffset(el)
+        const newText = text.slice(0, caret) + '\n' + text.slice(caret)
+        const newCaret = caret + 1
+        caretRef.current = newCaret
+        internalValue.current = newText
+        onChange(newText)
+        applyHighlight(newText, newCaret)
+      } else {
+        e.preventDefault()
+      }
+      return
+    }
     if (dropdown && dropdownMatches.length > 0) {
       if (e.key === 'ArrowDown') {
         e.preventDefault()
@@ -81,7 +243,7 @@ export function VariableInput({
         setHighlightedIndex((i) => (i - 1 + dropdownMatches.length) % dropdownMatches.length)
         return
       }
-      if (e.key === 'Enter' || e.key === 'Tab') {
+      if (e.key === 'Tab') {
         e.preventDefault()
         insertVar(dropdownMatches[highlightedIndex].key)
         return
@@ -90,20 +252,40 @@ export function VariableInput({
     if (e.key === 'Escape') {
       setDropdown(null)
     }
+    // Allow Tab for indentation in multiline mode (when dropdown is closed)
+    if (multiline && e.key === 'Tab' && !dropdown) {
+      e.preventDefault()
+      document.execCommand('insertText', false, '  ')
+    }
+  }
+
+  function handlePaste(e: React.ClipboardEvent<HTMLDivElement>): void {
+    e.preventDefault()
+    const text = e.clipboardData.getData('text/plain')
+    document.execCommand('insertText', false, text)
   }
 
   return (
-    <div className="relative min-w-0 flex-1">
-      <input
-        ref={inputRef}
-        value={value}
-        onChange={handleChange}
+    <div className={`relative ${multiline ? 'h-full' : 'min-w-0 flex-1'}`}>
+      <div
+        ref={editorRef}
+        contentEditable
+        suppressContentEditableWarning
+        onInput={handleInput}
         onKeyDown={handleKeyDown}
+        onCompositionStart={() => {
+          isComposing.current = true
+        }}
+        onCompositionEnd={() => {
+          isComposing.current = false
+          handleInput()
+        }}
         onBlur={() => {
           setTimeout(() => setDropdown(null), 150)
         }}
-        placeholder={placeholder}
-        className={className}
+        onPaste={handlePaste}
+        data-placeholder={placeholder}
+        className={`${className} ${multiline ? 'whitespace-pre-wrap' : 'whitespace-pre'} outline-none empty:before:content-[attr(data-placeholder)] empty:before:text-white/30`}
       />
 
       {dropdownMatches.length > 0 &&
@@ -114,10 +296,9 @@ export function VariableInput({
               position: 'fixed',
               top: dropdown.rect.bottom + 2,
               left: dropdown.rect.left,
-              minWidth: Math.max(dropdown.rect.width, 192),
               zIndex: 9999
             }}
-            className="max-h-48 overflow-y-auto rounded-lg border border-white/10 bg-op-primary shadow-lg"
+            className="max-h-32 w-56 overflow-y-auto rounded-lg border border-white/10 bg-op-primary shadow-lg"
           >
             {dropdownMatches.map((v, i) => (
               <button

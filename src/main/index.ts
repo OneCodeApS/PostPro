@@ -1,4 +1,4 @@
-import { app, shell, BrowserWindow, ipcMain, screen } from 'electron'
+import { app, shell, BrowserWindow, ipcMain, screen, net } from 'electron'
 import { join } from 'path'
 import { electronApp, optimizer, is } from '@electron-toolkit/utils'
 import icon from '../../resources/icon.png?asset'
@@ -28,6 +28,8 @@ function createWindow(): void {
     height: Math.round(height * 0.7),
     show: false,
     autoHideMenuBar: true,
+    frame: false,
+    titleBarStyle: 'hidden',
     ...(process.platform === 'linux' ? { icon } : {}),
     webPreferences: {
       preload: join(__dirname, '../preload/index.js'),
@@ -87,6 +89,47 @@ app.whenReady().then(() => {
   })
 
   ipcMain.handle('open-external', (_event, url: string) => shell.openExternal(url))
+
+  ipcMain.on('window-minimize', () => mainWindow?.minimize())
+  ipcMain.on('window-maximize', () => {
+    if (mainWindow?.isMaximized()) {
+      mainWindow.unmaximize()
+    } else {
+      mainWindow?.maximize()
+    }
+  })
+  ipcMain.on('window-close', () => mainWindow?.close())
+
+  ipcMain.handle(
+    'http-request',
+    async (
+      _event,
+      opts: { url: string; method: string; headers: Record<string, string>; body?: string }
+    ) => {
+      const start = Date.now()
+      try {
+        const res = await net.fetch(opts.url, {
+          method: opts.method,
+          headers: opts.headers,
+          body: opts.body ?? undefined
+        })
+        const body = await res.text()
+        const headers: Record<string, string> = {}
+        res.headers.forEach((val, key) => {
+          headers[key] = val
+        })
+        return {
+          status: res.status,
+          statusText: res.statusText,
+          headers,
+          body,
+          time: Date.now() - start
+        }
+      } catch (err) {
+        return { error: err instanceof Error ? err.message : 'Request failed' }
+      }
+    }
+  )
 
   createWindow()
 

@@ -45,6 +45,25 @@ export interface EnvironmentVariable {
   vault_secret_id: string | null
 }
 
+export interface Board {
+  id: string
+  name: string
+  workspace_id: string
+  archived: boolean
+  created_at: string
+}
+
+export interface BoardWithWorkspace extends Board {
+  workspace_name: string
+}
+
+export interface RequestBoard {
+  id: string
+  request_id: string
+  board_id: string
+  created_at: string
+}
+
 export interface AppUser {
   id: string
   display_name: string

@@ -1,10 +1,15 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
 import { useParams } from 'react-router-dom'
+import { useTabs } from '../../contexts/TabContext'
 import { supabase } from '../../lib/supabase'
 import { RequestService } from '../../services/RequestService'
 import { Button } from '../reusable/Button'
 import { VariableInput } from '../reusable/VariableInput'
 import { CurlSidebar } from './CurlSidebar'
+import { BodyEditor, getBodyForRequest } from './BodyEditor'
+import { BoardSearch } from '../reusable/BoardSearch'
+import { SchemaTab } from './SchemaTab'
+import { ResponsePanel } from './ResponsePanel'
 import { EnvironmentService } from '../../services/EnvironmentService'
 import type { Request, EnvironmentVariable } from '../../types'
 
@@ -39,8 +44,10 @@ interface ResponseState {
   time: number
 }
 
-export function RequestDetail(): React.JSX.Element {
-  const { requestId } = useParams<{ requestId: string }>()
+export function RequestDetail({ requestId: propRequestId }: { requestId?: string } = {}): React.JSX.Element {
+  const params_ = useParams<{ requestId: string }>()
+  const requestId = propRequestId ?? params_.requestId
+  const { setTabDirty, updateTab } = useTabs()
   const [request, setRequest] = useState<Request | null>(null)
   const [loading, setLoading] = useState(true)
   const [activeTab, setActiveTab] = useState<Tab>('params')
@@ -94,6 +101,15 @@ export function RequestDetail(): React.JSX.Element {
   useEffect(() => {
     checkDirty()
   }, [method, url, params, headers, body, schema])
+
+  // Report dirty state and method/name to tab context
+  useEffect(() => {
+    if (requestId) setTabDirty(requestId, dirty)
+  }, [dirty, requestId])
+
+  useEffect(() => {
+    if (requestId && request) updateTab(requestId, { name: request.name, method })
+  }, [method, request?.name, requestId])
 
   async function loadRequest(): Promise<void> {
     if (!requestId) return
@@ -195,6 +211,18 @@ export function RequestDetail(): React.JSX.Element {
     return () => document.removeEventListener('keydown', handleKeyDown)
   }, [handleSave])
 
+  // Listen for save events from tab context menu
+  useEffect(() => {
+    function handleSaveEvent(e: Event): void {
+      const detail = (e as CustomEvent).detail
+      if (detail?.requestId === requestId) {
+        void handleSave()
+      }
+    }
+    window.addEventListener('postpro-save-request', handleSaveEvent)
+    return () => window.removeEventListener('postpro-save-request', handleSaveEvent)
+  }, [handleSave, requestId])
+
   async function handleSend(): Promise<void> {
     if (!url.trim()) return
     setSending(true)
@@ -204,49 +232,73 @@ export function RequestDetail(): React.JSX.Element {
     // Save before sending
     await handleSave()
 
+    // Resolve all variables including secrets from vault
+    let resolvedVars: { key: string; value: string }[] = []
+    if (request?.collection_id) {
+      const { data: col } = await supabase
+        .from('postpro_collections')
+        .select('environment_id')
+        .eq('id', request.collection_id)
+        .single()
+      if (col?.environment_id) {
+        resolvedVars = await environmentService.getResolvedVariables(col.environment_id)
+      }
+    }
+
+    // Interpolate variables: replace {varName} with resolved variable values
+    function interpolate(text: string): string {
+      return text.replace(/\{(\w+)\}/g, (match, key) => {
+        const v = resolvedVars.find((ev) => ev.key === key)
+        return v ? v.value : match
+      })
+    }
+
     // Build query string from enabled params
     const queryString = params
       .filter((p) => p.enabled && p.key)
-      .map((p) => `${encodeURIComponent(p.key)}=${encodeURIComponent(p.value)}`)
+      .map(
+        (p) =>
+          `${encodeURIComponent(interpolate(p.key))}=${encodeURIComponent(interpolate(p.value))}`
+      )
       .join('&')
 
-    const fullUrl = queryString ? `${url}${url.includes('?') ? '&' : '?'}${queryString}` : url
+    const resolvedUrl = interpolate(url)
+    const fullUrl = queryString
+      ? `${resolvedUrl}${resolvedUrl.includes('?') ? '&' : '?'}${queryString}`
+      : resolvedUrl
 
     // Build headers
     const reqHeaders: Record<string, string> = {}
     for (const h of headers) {
-      if (h.enabled && h.key) reqHeaders[h.key] = h.value
+      if (h.enabled && h.key) reqHeaders[interpolate(h.key)] = interpolate(h.value)
     }
 
-    // Add content-type for body methods
-    if (body && !reqHeaders['Content-Type']) {
-      reqHeaders['Content-Type'] = 'application/json'
+    // Resolve body type and content, then interpolate the extracted body
+    const resolved = getBodyForRequest(body)
+    if (resolved.body) resolved.body = interpolate(resolved.body)
+    if (resolved.contentType && !reqHeaders['Content-Type']) {
+      reqHeaders['Content-Type'] = resolved.contentType
     }
-
-    const startTime = performance.now()
 
     try {
-      const res = await fetch(fullUrl, {
+      const res = await window.api.httpRequest({
+        url: fullUrl,
         method,
         headers: reqHeaders,
-        body: ['GET', 'HEAD'].includes(method) ? undefined : body || undefined
+        body: ['GET', 'HEAD'].includes(method) ? undefined : (resolved.body ?? undefined)
       })
 
-      const elapsed = Math.round(performance.now() - startTime)
-      const resBody = await res.text()
-
-      const resHeaders: Record<string, string> = {}
-      res.headers.forEach((val, key) => {
-        resHeaders[key] = val
-      })
-
-      setResponse({
-        status: res.status,
-        statusText: res.statusText,
-        headers: resHeaders,
-        body: resBody,
-        time: elapsed
-      })
+      if (res.error) {
+        setResponseError(res.error)
+      } else {
+        setResponse({
+          status: res.status!,
+          statusText: res.statusText!,
+          headers: res.headers!,
+          body: res.body!,
+          time: res.time!
+        })
+      }
     } catch (err) {
       setResponseError(err instanceof Error ? err.message : 'Request failed')
     } finally {
@@ -366,8 +418,9 @@ export function RequestDetail(): React.JSX.Element {
             )}
           </div>
 
-          {/* Send button */}
-          <Button size="md" onClick={handleSend} disabled={sending}>
+          {/* Board link + Send button */}
+          <BoardSearch requestId={requestId!} />
+          <Button variant="tertiary" size="md" onClick={handleSend} disabled={sending}>
             {sending ? 'Sending...' : 'Send'}
           </Button>
         </div>
@@ -419,59 +472,15 @@ export function RequestDetail(): React.JSX.Element {
             />
           )}
           {activeTab === 'body' && (
-            <div className="h-full p-4">
-              <textarea
-                value={body}
-                onChange={(e) => setBodyTracked(e.target.value)}
-                placeholder='{"key": "value"}'
-                className="h-full min-h-48 w-full resize-none rounded bg-white/5 p-3 font-mono text-sm text-white placeholder-white/30 outline-none focus:bg-white/10"
-              />
-            </div>
+            <BodyEditor value={body} onChange={setBodyTracked} variables={envVariables} />
           )}
           {activeTab === 'schema' && (
-            <div className="h-full p-4">
-              <textarea
-                value={schema}
-                onChange={(e) => setSchemaTracked(e.target.value)}
-                placeholder="JSON Schema"
-                className="h-full min-h-48 w-full resize-none rounded bg-white/5 p-3 font-mono text-sm text-white placeholder-white/30 outline-none focus:bg-white/10"
-              />
-            </div>
+            <SchemaTab schema={schema} onChange={setSchemaTracked} response={response} />
           )}
         </div>
 
         {/* Response */}
-        {(response || responseError) && (
-          <div className="border-t border-white/10">
-            <div className="flex items-center gap-3 px-4 py-2">
-              <span className="text-xs font-medium text-white/50">Response</span>
-              {response && (
-                <>
-                  <span
-                    className={`text-xs font-bold ${
-                      response.status < 300
-                        ? 'text-op-success'
-                        : response.status < 400
-                          ? 'text-op-warning'
-                          : 'text-op-error'
-                    }`}
-                  >
-                    {response.status} {response.statusText}
-                  </span>
-                  <span className="text-xs text-white/40">{response.time}ms</span>
-                </>
-              )}
-              {responseError && <span className="text-xs text-op-error">{responseError}</span>}
-            </div>
-            {response && (
-              <div className="max-h-64 overflow-y-auto px-4 pb-4">
-                <pre className="whitespace-pre-wrap rounded bg-white/5 p-3 font-mono text-xs text-white/80">
-                  {formatResponseBody(response.body)}
-                </pre>
-              </div>
-            )}
-          </div>
-        )}
+        <ResponsePanel response={response} responseError={responseError} sending={sending} />
       </div>
 
       <CurlSidebar method={method} url={url} params={params} headers={headers} body={body} />
@@ -502,8 +511,8 @@ function KeyValueEditor({
       <thead>
         <tr className="border-b border-white/10 text-left text-xs text-white/50">
           <th className="w-8 px-4 py-2"></th>
-          <th className="px-4 py-2 font-medium">Key</th>
-          <th className="px-4 py-2 font-medium">Value</th>
+          <th className="w-1/2 px-4 py-2 font-medium">Key</th>
+          <th className="w-1/2 px-4 py-2 font-medium">Value</th>
           <th className="w-10 px-4 py-2"></th>
         </tr>
       </thead>
@@ -563,12 +572,4 @@ function KeyValueEditor({
       </tbody>
     </table>
   )
-}
-
-function formatResponseBody(body: string): string {
-  try {
-    return JSON.stringify(JSON.parse(body), null, 2)
-  } catch {
-    return body
-  }
 }

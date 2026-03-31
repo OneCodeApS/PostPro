@@ -1,6 +1,6 @@
 import { type ButtonHTMLAttributes } from 'react'
 
-type ButtonVariant = 'primary' | 'secondary' | 'danger' | 'success'
+type ButtonVariant = 'primary' | 'secondary' | 'tertiary' | 'danger' | 'success'
 type ButtonSize = 'sm' | 'md' | 'lg'
 
 interface ButtonProps extends ButtonHTMLAttributes<HTMLButtonElement> {
@@ -11,6 +11,7 @@ interface ButtonProps extends ButtonHTMLAttributes<HTMLButtonElement> {
 const variantClasses: Record<ButtonVariant, string> = {
   primary: 'bg-op-primary hover:bg-op-primary/80',
   secondary: 'bg-op-secondary hover:bg-op-secondary/80',
+  tertiary: 'bg-op-tertiary hover:bg-op-tertiary/80',
   danger: 'bg-op-error hover:bg-op-error/80',
   success: 'bg-op-success hover:bg-op-success/80'
 }

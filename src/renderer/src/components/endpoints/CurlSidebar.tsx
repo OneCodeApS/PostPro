@@ -1,4 +1,5 @@
 import { useState } from 'react'
+import { getBodyForRequest } from './BodyEditor'
 
 interface CurlSidebarProps {
   method: string
@@ -28,12 +29,13 @@ function generateCurl({ method, url, params, headers, body }: CurlSidebarProps):
     }
   }
 
-  if (body && !['GET', 'HEAD'].includes(method)) {
+  const resolved = getBodyForRequest(body)
+  if (resolved.body && !['GET', 'HEAD'].includes(method)) {
     const hasContentType = headers.some((h) => h.enabled && h.key.toLowerCase() === 'content-type')
-    if (!hasContentType) {
-      parts.push("-H 'Content-Type: application/json'")
+    if (!hasContentType && resolved.contentType) {
+      parts.push(`-H 'Content-Type: ${resolved.contentType}'`)
     }
-    parts.push(`-d '${body}'`)
+    parts.push(`-d '${resolved.body}'`)
   }
 
   return parts.join(' \\\n  ')

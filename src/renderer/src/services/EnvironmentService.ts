@@ -54,6 +54,27 @@ export class EnvironmentService {
     return data
   }
 
+  async getResolvedVariables(
+    environmentId: string
+  ): Promise<{ key: string; value: string }[]> {
+    const vars = await this.getVariables(environmentId)
+    const resolved: { key: string; value: string }[] = []
+    for (const v of vars) {
+      if (!v.enabled) continue
+      if (v.is_secret && v.vault_secret_id) {
+        try {
+          const secret = await this.readVaultSecret(v.vault_secret_id)
+          resolved.push({ key: v.key, value: secret })
+        } catch {
+          resolved.push({ key: v.key, value: '' })
+        }
+      } else {
+        resolved.push({ key: v.key, value: v.value ?? '' })
+      }
+    }
+    return resolved
+  }
+
   async createVariable(
     variable: Pick<EnvironmentVariable, 'environment_id' | 'key'> &
       Partial<Pick<EnvironmentVariable, 'enabled' | 'value' | 'is_secret' | 'vault_secret_id'>>
