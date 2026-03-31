@@ -1,32 +1,27 @@
 import { useEffect, useState } from 'react'
-import { supabase } from '../lib/supabase'
-import { EnvironmentService } from '../services/EnvironmentService'
-import type { Environment } from '../types'
+import { useNavigate, useParams } from 'react-router-dom'
+import { supabase } from '../../lib/supabase'
+import { EnvironmentService } from '../../services/EnvironmentService'
+import type { Environment } from '../../types'
 
 interface EnvironmentsPanelProps {
   companyId: string
-  onSelectEnvironment: (env: Environment) => void
-  selectedEnvironmentId: string | null
 }
 
-export function EnvironmentsPanel({
-  companyId,
-  onSelectEnvironment,
-  selectedEnvironmentId
-}: EnvironmentsPanelProps): React.JSX.Element {
+export function EnvironmentsPanel({ companyId }: EnvironmentsPanelProps): React.JSX.Element {
   const [environments, setEnvironments] = useState<Environment[]>([])
   const [loading, setLoading] = useState(true)
+  const navigate = useNavigate()
+  const { environmentId } = useParams()
 
   useEffect(() => {
     const envService = new EnvironmentService(supabase)
 
-    async function load(): Promise<void> {
+    void (async () => {
       const envs = await envService.getAll(companyId)
       setEnvironments(envs)
       setLoading(false)
-    }
-
-    load()
+    })()
   }, [companyId])
 
   if (loading) {
@@ -38,7 +33,7 @@ export function EnvironmentsPanel({
   }
 
   return (
-    <div className="flex h-full flex-col">
+    <div className="flex h-full flex-col bg-op-primary">
       <div className="flex items-center justify-between border-b border-white/10 px-4 py-3">
         <h2 className="text-sm font-semibold text-white">Environments</h2>
       </div>
@@ -49,9 +44,9 @@ export function EnvironmentsPanel({
           environments.map((env) => (
             <button
               key={env.id}
-              onClick={() => onSelectEnvironment(env)}
+              onClick={() => navigate(`/environments/${env.id}`)}
               className={`flex w-full items-center gap-2 rounded px-3 py-2 text-left text-sm transition-colors ${
-                selectedEnvironmentId === env.id
+                environmentId === env.id
                   ? 'bg-white/15 text-white'
                   : 'text-white/70 hover:bg-white/10'
               }`}

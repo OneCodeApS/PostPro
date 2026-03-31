@@ -39,8 +39,10 @@ export interface EnvironmentVariable {
   id: string
   environment_id: string
   key: string
+  value: string | null
+  is_secret: boolean
   enabled: boolean
-  vault_secret_id: string
+  vault_secret_id: string | null
 }
 
 export interface AppUser {

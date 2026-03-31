@@ -1,10 +1,12 @@
-import { useState, useRef, useEffect } from 'react'
+import { useRef, useEffect, useState } from 'react'
+import { HashRouter, Routes, Route, Navigate, Outlet } from 'react-router-dom'
 import { AuthProvider, useAuth } from './contexts/AuthContext'
-import { Sidebar, type NavPage } from './components/Sidebar'
-import { EndpointsPanel } from './components/EndpointsPanel'
-import { EnvironmentsPanel } from './components/EnvironmentsPanel'
+import { Sidebar } from './components/Sidebar'
+import { EndpointsPanel } from './components/endpoints/EndpointsPanel'
+import { RequestDetail } from './components/endpoints/RequestDetail'
+import { EnvironmentsPanel } from './components/environments/EnvironmentsPanel'
+import { EnvironmentDetail } from './components/environments/EnvironmentDetail'
 import { DetailPanel } from './components/DetailPanel'
-import type { Request, Environment } from './types'
 
 function UserMenu(): React.JSX.Element {
   const { user, signOut } = useAuth()
@@ -56,7 +58,7 @@ function LoginPage(): React.JSX.Element {
     <div className="flex h-screen items-center justify-center">
       <button
         onClick={signInWithMicrosoft}
-        className="border border-red-500 m-4 flex items-center gap-3 rounded border border-gray-300 bg-white px-10 py-4 text-sm font-semibold text-[#5e5e5e] shadow-sm transition-colors hover:bg-gray-50 active:bg-gray-100"
+        className="border border-red-500 m-4 flex items-center gap-3 rounded border border-gray-300 bg-op-primary px-10 py-4 text-sm font-semibold text-[#5e5e5e] shadow-sm transition-colors hover:bg-gray-50 active:bg-gray-100"
       >
         <svg xmlns="http://www.w3.org/2000/svg" width="21" height="21" viewBox="0 0 21 21">
           <rect x="1" y="1" width="9" height="9" fill="#f25022" />
@@ -70,60 +72,58 @@ function LoginPage(): React.JSX.Element {
   )
 }
 
-function AuthenticatedApp(): React.JSX.Element {
+function EndpointsRoute(): React.JSX.Element {
   const { companyId } = useAuth()
-  const [activePage, setActivePage] = useState<NavPage>('endpoints')
-  const [selectedRequest, setSelectedRequest] = useState<Request | null>(null)
-  const [selectedEnvironment, setSelectedEnvironment] = useState<Environment | null>(null)
 
-  if (!companyId) {
-    return (
-      <div className="flex h-screen items-center justify-center text-white/40">
-        No company associated with your account.
-      </div>
-    )
-  }
-
-  function handleNavigate(page: NavPage): void {
-    setActivePage(page)
-    setSelectedRequest(null)
-    setSelectedEnvironment(null)
-  }
+  if (!companyId) return <NoCompany />
 
   return (
+    <>
+      <div className="w-64 shrink-0 border-r border-white/10 overflow-hidden">
+        <EndpointsPanel companyId={companyId} />
+      </div>
+      <div className="flex-1 overflow-hidden">
+        <Outlet />
+      </div>
+    </>
+  )
+}
+
+function EnvironmentsRoute(): React.JSX.Element {
+  const { companyId } = useAuth()
+
+  if (!companyId) return <NoCompany />
+
+  return (
+    <>
+      <div className="w-64 shrink-0 border-r border-white/10 overflow-hidden">
+        <EnvironmentsPanel companyId={companyId} />
+      </div>
+      <div className="flex-1 overflow-hidden">
+        <Outlet />
+      </div>
+    </>
+  )
+}
+
+function NoCompany(): React.JSX.Element {
+  return (
+    <div className="flex flex-1 items-center justify-center text-white/40">
+      No company associated with your account.
+    </div>
+  )
+}
+
+function AppLayout(): React.JSX.Element {
+  return (
     <div className="flex h-screen flex-col">
-      {/* Top bar */}
-      <div className="flex items-center justify-between border-b border-white/10 px-4 py-2">
+      <div className="flex items-center justify-between border-b border-white/10 px-4 py-2 bg-op-primary">
         <h1 className="text-lg font-bold text-white">PostPro</h1>
         <UserMenu />
       </div>
-
-      {/* 3-column layout */}
       <div className="flex flex-1 overflow-hidden">
-        {/* Column 1: Sidebar nav */}
-        <Sidebar activePage={activePage} onNavigate={handleNavigate} />
-
-        {/* Column 2: Context-dependent list */}
-        <div className="w-64 shrink-0 border-r border-white/10 overflow-hidden">
-          {activePage === 'endpoints' ? (
-            <EndpointsPanel
-              companyId={companyId}
-              onSelectRequest={setSelectedRequest}
-              selectedRequestId={selectedRequest?.id ?? null}
-            />
-          ) : (
-            <EnvironmentsPanel
-              companyId={companyId}
-              onSelectEnvironment={setSelectedEnvironment}
-              selectedEnvironmentId={selectedEnvironment?.id ?? null}
-            />
-          )}
-        </div>
-
-        {/* Column 3: Detail panel */}
-        <div className="flex-1 overflow-hidden">
-          <DetailPanel />
-        </div>
+        <Sidebar />
+        <Outlet />
       </div>
     </div>
   )
@@ -140,14 +140,38 @@ function AppContent(): React.JSX.Element {
     )
   }
 
-  return session ? <AuthenticatedApp /> : <LoginPage />
+  if (!session) return <LoginPage />
+
+  return (
+    <Routes>
+      <Route element={<AppLayout />}>
+        <Route path="/endpoints" element={<EndpointsRoute />}>
+          <Route
+            index
+            element={<DetailPanel selectedEnvironment={null} selectedRequest={null} />}
+          />
+          <Route path=":requestId" element={<RequestDetail />} />
+        </Route>
+        <Route path="/environments" element={<EnvironmentsRoute />}>
+          <Route
+            index
+            element={<DetailPanel selectedEnvironment={null} selectedRequest={null} />}
+          />
+          <Route path=":environmentId" element={<EnvironmentDetail />} />
+        </Route>
+        <Route path="*" element={<Navigate to="/endpoints" replace />} />
+      </Route>
+    </Routes>
+  )
 }
 
 function App(): React.JSX.Element {
   return (
-    <AuthProvider>
-      <AppContent />
-    </AuthProvider>
+    <HashRouter>
+      <AuthProvider>
+        <AppContent />
+      </AuthProvider>
+    </HashRouter>
   )
 }
 

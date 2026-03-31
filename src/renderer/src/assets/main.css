@@ -2,9 +2,9 @@
 @import 'tailwindcss';
 
 @theme {
-  --color-op-primary: #175673;
-  --color-op-secondary: #4C2878;
-  --color-op-tertiary: #1B5E3B;
+  --color-op-primary: #1f2937;
+  --color-op-secondary: #353E4B;
+  --color-op-tertiary: #1e88e5;
   --color-op-error: #B91C1C;
   --color-op-success: #15803D;
   --color-op-warning: #B45309;

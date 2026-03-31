@@ -6,7 +6,7 @@ The project uses custom Tailwind CSS theme colors with the `op-` prefix:
 
 ```css
 --color-op-primary: #175673;
---color-op-secondary: #4C2878;
+--color-op-secondary: #124562;
 --color-op-tertiary: #1B5E3B;
 --color-op-error: #B91C1C;
 --color-op-success: #15803D;
@@ -19,7 +19,7 @@ The project uses custom Tailwind CSS theme colors with the `op-` prefix:
 | Token | Hex | Role |
 |-------|-----|------|
 | `op-primary` | `#175673` | Main actions, brand identity |
-| `op-secondary` | `#4C2878` | Secondary actions, accents |
+| `op-secondary` | `#124562` | Secondary surfaces, darker backgrounds |
 | `op-tertiary` | `#1B5E3B` | Supporting UI, tags, badges |
 | `op-error` | `#B91C1C` | Errors, destructive actions |
 | `op-success` | `#15803D` | Confirmations, completed states |

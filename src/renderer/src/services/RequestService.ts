@@ -30,7 +30,12 @@ export class RequestService {
 
   async create(
     request: Pick<Request, 'collection_id' | 'name'> &
-      Partial<Pick<Request, 'method' | 'url' | 'query_params' | 'headers' | 'body_type' | 'body' | 'sort_order'>>
+      Partial<
+        Pick<
+          Request,
+          'method' | 'url' | 'query_params' | 'headers' | 'body_type' | 'body' | 'sort_order'
+        >
+      >
   ): Promise<Request> {
     const { data, error } = await this.supabase
       .from('postpro_requests')
@@ -55,10 +60,7 @@ export class RequestService {
   }
 
   async delete(id: string): Promise<void> {
-    const { error } = await this.supabase
-      .from('postpro_requests')
-      .delete()
-      .eq('id', id)
+    const { error } = await this.supabase.from('postpro_requests').delete().eq('id', id)
 
     if (error) throw error
   }
