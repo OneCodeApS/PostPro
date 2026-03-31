@@ -9,7 +9,7 @@ export class CollectionService {
       .from('postpro_collections')
       .select('*')
       .eq('company_id', companyId)
-      .order('name')
+      .order('created_at')
 
     if (error) throw error
     return data

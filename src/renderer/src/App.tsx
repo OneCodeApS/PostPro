@@ -14,19 +14,44 @@ function LoginPage(): React.JSX.Element {
   const { signInWithMicrosoft } = useAuth()
 
   return (
-    <div className="flex h-screen items-center justify-center">
-      <button
-        onClick={signInWithMicrosoft}
-        className="border border-red-500 m-4 flex items-center gap-3 rounded border border-gray-300 bg-op-primary px-10 py-4 text-sm font-semibold text-[#5e5e5e] shadow-sm transition-colors hover:bg-gray-50 active:bg-gray-100"
-      >
-        <svg xmlns="http://www.w3.org/2000/svg" width="21" height="21" viewBox="0 0 21 21">
-          <rect x="1" y="1" width="9" height="9" fill="#f25022" />
-          <rect x="11" y="1" width="9" height="9" fill="#7fba00" />
-          <rect x="1" y="11" width="9" height="9" fill="#00a4ef" />
-          <rect x="11" y="11" width="9" height="9" fill="#ffb900" />
-        </svg>
-        Sign in with Microsoft
-      </button>
+    <div className="flex h-screen flex-col bg-op-primary">
+      <div className="flex h-10 shrink-0 items-center border-b border-white/10 [-webkit-app-region:drag]">
+        <span className="px-4 text-sm font-bold text-white">PostPro</span>
+        <div className="ml-auto flex [-webkit-app-region:no-drag]">
+          <button
+            onClick={() => window.api.windowMinimize()}
+            className="flex h-8 w-10 items-center justify-center text-white/40 transition-colors hover:bg-white/10 hover:text-white"
+          >
+            <svg width="10" height="1" viewBox="0 0 10 1"><rect width="10" height="1" fill="currentColor" /></svg>
+          </button>
+          <button
+            onClick={() => window.api.windowMaximize()}
+            className="flex h-8 w-10 items-center justify-center text-white/40 transition-colors hover:bg-white/10 hover:text-white"
+          >
+            <svg width="10" height="10" viewBox="0 0 10 10" fill="none" stroke="currentColor" strokeWidth="1"><rect x="0.5" y="0.5" width="9" height="9" /></svg>
+          </button>
+          <button
+            onClick={() => window.api.windowClose()}
+            className="flex h-8 w-10 items-center justify-center text-white/40 transition-colors hover:bg-red-500/80 hover:text-white"
+          >
+            <svg width="10" height="10" viewBox="0 0 10 10" stroke="currentColor" strokeWidth="1.2"><line x1="1" y1="1" x2="9" y2="9" /><line x1="9" y1="1" x2="1" y2="9" /></svg>
+          </button>
+        </div>
+      </div>
+      <div className="flex flex-1 items-center justify-center">
+        <button
+          onClick={signInWithMicrosoft}
+          className="flex items-center gap-3 rounded-lg border border-white/10 bg-white/5 px-10 py-4 text-sm font-semibold text-white shadow-sm transition-colors hover:bg-white/10 active:bg-white/15"
+        >
+          <svg xmlns="http://www.w3.org/2000/svg" width="21" height="21" viewBox="0 0 21 21">
+            <rect x="1" y="1" width="9" height="9" fill="#f25022" />
+            <rect x="11" y="1" width="9" height="9" fill="#7fba00" />
+            <rect x="1" y="11" width="9" height="9" fill="#00a4ef" />
+            <rect x="11" y="11" width="9" height="9" fill="#ffb900" />
+          </svg>
+          Sign in with Microsoft
+        </button>
+      </div>
     </div>
   )
 }

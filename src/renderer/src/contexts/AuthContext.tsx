@@ -59,7 +59,15 @@ export function AuthProvider({ children }: { children: React.ReactNode }): React
       _event: unknown,
       { accessToken, refreshToken }: { accessToken: string; refreshToken: string }
     ): void => {
-      supabase.auth.setSession({ access_token: accessToken, refresh_token: refreshToken })
+      void (async () => {
+        setLoading(true)
+        const { error } = await supabase.auth.setSession({
+          access_token: accessToken,
+          refresh_token: refreshToken
+        })
+        if (error) console.error('Failed to set session:', error)
+        setLoading(false)
+      })()
     }
 
     window.electron.ipcRenderer.on('auth-callback', handleAuthCallback)

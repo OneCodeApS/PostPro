@@ -162,14 +162,15 @@ export function EndpointsPanel({ companyId }: EndpointsPanelProps): React.JSX.El
     setContextMenu({ x: e.clientX, y: e.clientY, type: 'request', targetId: requestId })
   }
 
-  async function handleCreateFolder(parentId: string): Promise<void> {
-    await collectionService.create({
+  async function handleCreateFolder(parentId: string | null): Promise<void> {
+    const newCol = await collectionService.create({
       company_id: companyId,
       name: 'New Folder',
       parent_collection_id: parentId
     })
-    setExpandedIds((prev) => new Set(prev).add(parentId))
+    if (parentId) setExpandedIds((prev) => new Set(prev).add(parentId))
     await load()
+    handleStartRename('collection', newCol.id)
   }
 
   function handleStartRename(type: 'collection' | 'request', id: string): void {
@@ -261,7 +262,29 @@ export function EndpointsPanel({ companyId }: EndpointsPanelProps): React.JSX.El
   return (
     <div className="flex h-full flex-col bg-op-primary">
       <div className="border-b border-white/10 px-4 py-3">
-        <h2 className="mb-2 text-sm font-semibold text-white">Endpoints</h2>
+        <div className="mb-2 flex items-center justify-between">
+          <h2 className="text-sm font-semibold text-white">Endpoints</h2>
+          <button
+            onClick={() => void handleCreateFolder(null)}
+            title="New Folder"
+            className="flex h-6 w-6 items-center justify-center rounded text-white/40 transition-colors hover:bg-white/10 hover:text-white"
+          >
+            <svg
+              xmlns="http://www.w3.org/2000/svg"
+              width="14"
+              height="14"
+              viewBox="0 0 24 24"
+              fill="none"
+              stroke="currentColor"
+              strokeWidth="2"
+              strokeLinecap="round"
+              strokeLinejoin="round"
+            >
+              <path d="M12 5v14" />
+              <path d="M5 12h14" />
+            </svg>
+          </button>
+        </div>
         <SearchInput
           value={searchQuery}
           onChange={setSearchQuery}
