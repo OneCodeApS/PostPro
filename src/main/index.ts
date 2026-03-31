@@ -1,6 +1,7 @@
 import { app, shell, BrowserWindow, ipcMain, screen, net } from 'electron'
 import { join } from 'path'
 import { electronApp, optimizer, is } from '@electron-toolkit/utils'
+import { autoUpdater } from 'electron-updater'
 import icon from '../../resources/icon.png?asset'
 
 const PROTOCOL = 'postpro'
@@ -132,6 +133,36 @@ app.whenReady().then(() => {
   )
 
   createWindow()
+
+  // Auto-updater
+  autoUpdater.autoDownload = false
+  autoUpdater.checkForUpdates()
+
+  autoUpdater.on('update-available', (info) => {
+    mainWindow?.webContents.send('update-available', {
+      version: info.version
+    })
+  })
+
+  autoUpdater.on('update-downloaded', () => {
+    mainWindow?.webContents.send('update-downloaded')
+  })
+
+  autoUpdater.on('download-progress', (progress) => {
+    mainWindow?.webContents.send('update-progress', {
+      percent: Math.round(progress.percent)
+    })
+  })
+
+  ipcMain.on('download-update', () => {
+    autoUpdater.downloadUpdate()
+  })
+
+  ipcMain.on('install-update', () => {
+    autoUpdater.quitAndInstall()
+  })
+
+  ipcMain.handle('get-app-version', () => app.getVersion())
 
   app.on('activate', function () {
     if (BrowserWindow.getAllWindows().length === 0) createWindow()

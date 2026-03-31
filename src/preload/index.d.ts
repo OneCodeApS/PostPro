@@ -20,6 +20,12 @@ declare global {
       windowMinimize: () => void
       windowMaximize: () => void
       windowClose: () => void
+      getAppVersion: () => Promise<string>
+      downloadUpdate: () => void
+      installUpdate: () => void
+      onUpdateAvailable: (cb: (info: { version: string }) => void) => () => void
+      onUpdateDownloaded: (cb: () => void) => () => void
+      onUpdateProgress: (cb: (info: { percent: number }) => void) => () => void
     }
   }
 }

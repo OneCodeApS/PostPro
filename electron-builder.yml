@@ -1,5 +1,5 @@
-appId: com.electron.app
-productName: package.json
+appId: com.onecode.postpro
+productName: PostPro
 directories:
   buildResources: build
 files:
@@ -12,12 +12,18 @@ files:
 asarUnpack:
   - resources/**
 win:
-  executableName: package.json
+  executableName: PostPro
+  target:
+    - nsis
+  icon: build/icon.ico
 nsis:
-  artifactName: ${name}-${version}-setup.${ext}
-  shortcutName: ${productName}
-  uninstallDisplayName: ${productName}
+  oneClick: false
+  allowToChangeInstallationDirectory: true
+  artifactName: PostPro-${version}-setup.${ext}
+  shortcutName: PostPro
+  uninstallDisplayName: PostPro
   createDesktopShortcut: always
+  createStartMenuShortcut: true
 mac:
   entitlementsInherit: build/entitlements.mac.plist
   extendInfo:
@@ -27,17 +33,18 @@ mac:
     - NSDownloadsFolderUsageDescription: Application requests access to the user's Downloads folder.
   notarize: false
 dmg:
-  artifactName: ${name}-${version}.${ext}
+  artifactName: PostPro-${version}.${ext}
 linux:
   target:
     - AppImage
     - snap
     - deb
-  maintainer: electronjs.org
+  maintainer: onecode.dk
   category: Utility
 appImage:
-  artifactName: ${name}-${version}.${ext}
+  artifactName: PostPro-${version}.${ext}
 npmRebuild: false
 publish:
-  provider: generic
-  url: https://example.com/auto-updates
+  provider: github
+  owner: Eliyo93
+  repo: PostPro

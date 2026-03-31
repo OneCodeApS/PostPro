@@ -17,7 +17,25 @@ const api = {
   }> => ipcRenderer.invoke('http-request', opts),
   windowMinimize: (): void => ipcRenderer.send('window-minimize'),
   windowMaximize: (): void => ipcRenderer.send('window-maximize'),
-  windowClose: (): void => ipcRenderer.send('window-close')
+  windowClose: (): void => ipcRenderer.send('window-close'),
+  getAppVersion: (): Promise<string> => ipcRenderer.invoke('get-app-version'),
+  downloadUpdate: (): void => ipcRenderer.send('download-update'),
+  installUpdate: (): void => ipcRenderer.send('install-update'),
+  onUpdateAvailable: (cb: (info: { version: string }) => void): (() => void) => {
+    const handler = (_: unknown, info: { version: string }): void => cb(info)
+    ipcRenderer.on('update-available', handler)
+    return () => ipcRenderer.removeListener('update-available', handler)
+  },
+  onUpdateDownloaded: (cb: () => void): (() => void) => {
+    const handler = (): void => cb()
+    ipcRenderer.on('update-downloaded', handler)
+    return () => ipcRenderer.removeListener('update-downloaded', handler)
+  },
+  onUpdateProgress: (cb: (info: { percent: number }) => void): (() => void) => {
+    const handler = (_: unknown, info: { percent: number }): void => cb(info)
+    ipcRenderer.on('update-progress', handler)
+    return () => ipcRenderer.removeListener('update-progress', handler)
+  }
 }
 
 if (process.contextIsolated) {
