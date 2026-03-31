@@ -16,7 +16,7 @@ win:
   target:
     - nsis
   icon: build/icon.ico
-  sign: false
+  signAndEditExecutable: false
 nsis:
   oneClick: false
   allowToChangeInstallationDirectory: true
