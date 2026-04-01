@@ -26,6 +26,9 @@ declare global {
       onUpdateAvailable: (cb: (info: { version: string }) => void) => () => void
       onUpdateDownloaded: (cb: () => void) => () => void
       onUpdateProgress: (cb: (info: { percent: number }) => void) => () => void
+      onAuthCallback: (
+        cb: (payload: { code?: string; accessToken?: string; refreshToken?: string }) => void
+      ) => () => void
     }
   }
 }

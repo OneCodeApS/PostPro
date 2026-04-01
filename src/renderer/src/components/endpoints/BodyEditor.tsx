@@ -16,7 +16,12 @@ interface BodyEditorProps {
   variables: EnvironmentVariable[]
 }
 
-function parseBodyState(value: string): { type: BodyType; json: string; formData: FormDataRow[]; raw: string } {
+function parseBodyState(value: string): {
+  type: BodyType
+  json: string
+  formData: FormDataRow[]
+  raw: string
+} {
   // Try to detect what type the stored body is
   let json = ''
   let formData: FormDataRow[] = [{ key: '', value: '', enabled: true }]
@@ -45,13 +50,19 @@ function parseBodyState(value: string): { type: BodyType; json: string; formData
   return { type: 'json', json, formData, raw }
 }
 
-function serializeBodyState(type: BodyType, json: string, formData: FormDataRow[], raw: string): string {
+function serializeBodyState(
+  type: BodyType,
+  json: string,
+  formData: FormDataRow[],
+  raw: string
+): string {
   return JSON.stringify({ __bodyType: type, json, formData, raw })
 }
 
-export function getBodyForRequest(
-  bodyValue: string
-): { contentType: string | null; body: string | null } {
+export function getBodyForRequest(bodyValue: string): {
+  contentType: string | null
+  body: string | null
+} {
   if (!bodyValue) return { contentType: null, body: null }
 
   try {
@@ -92,7 +103,9 @@ export function BodyEditor({ value, onChange, variables }: BodyEditorProps): Rea
 
   // Track last value prop to detect external changes (e.g. loading a different request)
   const lastValueRef = useRef(value)
-  const lastSerializedRef = useRef(serializeBodyState(initial.type, initial.json, initial.formData, initial.raw))
+  const lastSerializedRef = useRef(
+    serializeBodyState(initial.type, initial.json, initial.formData, initial.raw)
+  )
 
   if (value !== lastValueRef.current && value !== lastSerializedRef.current) {
     // External change — re-parse
@@ -185,9 +198,7 @@ export function BodyEditor({ value, onChange, variables }: BodyEditorProps): Rea
             key={tab.id}
             onClick={() => handleBodyTypeChange(tab.id)}
             className={`rounded px-2.5 py-1 text-xs font-medium transition-colors ${
-              bodyType === tab.id
-                ? 'bg-white/10 text-white'
-                : 'text-white/40 hover:text-white/70'
+              bodyType === tab.id ? 'bg-white/10 text-white' : 'text-white/40 hover:text-white/70'
             }`}
           >
             {tab.label}

@@ -30,10 +30,7 @@ export function Modal({ title, onClose, children }: ModalProps): React.JSX.Eleme
       <div className="w-full max-w-md rounded-lg border border-white/10 bg-[#2a2a2e] shadow-xl">
         <div className="flex items-center justify-between border-b border-white/10 px-4 py-3">
           <h3 className="text-sm font-semibold text-white">{title}</h3>
-          <button
-            onClick={onClose}
-            className="text-white/40 hover:text-white/70"
-          >
+          <button onClick={onClose} className="text-white/40 hover:text-white/70">
             <svg
               xmlns="http://www.w3.org/2000/svg"
               width="16"

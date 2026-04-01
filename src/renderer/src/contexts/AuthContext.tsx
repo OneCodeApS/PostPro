@@ -1,6 +1,6 @@
 import { createContext, useContext, useEffect, useState } from 'react'
 import type { Session, User } from '@supabase/supabase-js'
-import { supabase } from '../lib/supabase'
+import { supabase, storeSessionAndReload } from '../lib/supabase'
 
 interface AuthContextType {
   session: Session | null
@@ -53,28 +53,11 @@ export function AuthProvider({ children }: { children: React.ReactNode }): React
       } else {
         setCompanyId(null)
       }
+      setLoading(false)
     })
-
-    const handleAuthCallback = (
-      _event: unknown,
-      { accessToken, refreshToken }: { accessToken: string; refreshToken: string }
-    ): void => {
-      void (async () => {
-        setLoading(true)
-        const { error } = await supabase.auth.setSession({
-          access_token: accessToken,
-          refresh_token: refreshToken
-        })
-        if (error) console.error('Failed to set session:', error)
-        setLoading(false)
-      })()
-    }
-
-    window.electron.ipcRenderer.on('auth-callback', handleAuthCallback)
 
     return () => {
       subscription.unsubscribe()
-      window.electron.ipcRenderer.removeListener('auth-callback', handleAuthCallback)
     }
   }, [])
 
@@ -83,15 +66,32 @@ export function AuthProvider({ children }: { children: React.ReactNode }): React
       provider: 'azure',
       options: {
         scopes: 'openid profile email',
-        redirectTo: 'postpro://auth/callback'
+        redirectTo: 'http://localhost:48372/auth-callback',
+        skipBrowserRedirect: true
       }
     })
 
     if (error) throw error
+    if (!data.url) return
 
-    if (data.url) {
-      window.electron.ipcRenderer.invoke('open-external', data.url)
+    setLoading(true)
+
+    try {
+      const result = await window.electron.ipcRenderer.invoke('open-auth-window', data.url)
+
+      if (result.ok && result.accessToken) {
+        // Write session to localStorage and reload — bypasses setSession
+        // which hangs in Electron. On reload, getSession() picks it up.
+        storeSessionAndReload(result.accessToken, result.refreshToken ?? '')
+        return
+      } else if (!result.ok) {
+        console.error('Auth failed:', result.error)
+      }
+    } catch (err) {
+      console.error('[auth] ERROR:', err)
     }
+
+    setLoading(false)
   }
 
   const signOut = async (): Promise<void> => {

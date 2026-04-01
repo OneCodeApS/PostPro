@@ -19,7 +19,11 @@ function UpdateBadge(): React.JSX.Element | null {
     const off3 = window.api.onUpdateProgress((info) => {
       setProgress(info.percent)
     })
-    return () => { off1(); off2(); off3() }
+    return () => {
+      off1()
+      off2()
+      off3()
+    }
   }, [])
 
   if (state === 'idle') return null
@@ -114,7 +118,14 @@ function WindowControls(): React.JSX.Element {
         onClick={() => window.api.windowMaximize()}
         className="flex h-8 w-10 items-center justify-center text-white/40 transition-colors hover:bg-white/10 hover:text-white"
       >
-        <svg width="10" height="10" viewBox="0 0 10 10" fill="none" stroke="currentColor" strokeWidth="1">
+        <svg
+          width="10"
+          height="10"
+          viewBox="0 0 10 10"
+          fill="none"
+          stroke="currentColor"
+          strokeWidth="1"
+        >
           <rect x="0.5" y="0.5" width="9" height="9" />
         </svg>
       </button>

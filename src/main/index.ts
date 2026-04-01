@@ -1,18 +1,9 @@
 import { app, shell, BrowserWindow, ipcMain, screen, net } from 'electron'
 import { join } from 'path'
+import { createServer, type Server } from 'http'
 import { electronApp, optimizer, is } from '@electron-toolkit/utils'
 import { autoUpdater } from 'electron-updater'
 import icon from '../../resources/icon.png?asset'
-
-const PROTOCOL = 'postpro'
-
-if (process.defaultApp) {
-  if (process.argv.length >= 2) {
-    app.setAsDefaultProtocolClient(PROTOCOL, process.execPath, [process.argv[1]])
-  }
-} else {
-  app.setAsDefaultProtocolClient(PROTOCOL)
-}
 
 const gotTheLock = app.requestSingleInstanceLock()
 
@@ -54,32 +45,11 @@ function createWindow(): void {
   }
 }
 
-function handleAuthCallback(url: string): void {
-  const parsed = new URL(url)
-  const params = parsed.hash
-    ? new URLSearchParams(parsed.hash.substring(1))
-    : parsed.searchParams
-
-  const accessToken = params.get('access_token')
-  const refreshToken = params.get('refresh_token')
-
-  if (accessToken && mainWindow) {
-    mainWindow.webContents.send('auth-callback', { accessToken, refreshToken })
-    mainWindow.focus()
-  }
-}
-
-app.on('second-instance', (_event, argv) => {
-  const url = argv.find((arg) => arg.startsWith(`${PROTOCOL}://`))
-  if (url) handleAuthCallback(url)
+app.on('second-instance', () => {
   if (mainWindow) {
     if (mainWindow.isMinimized()) mainWindow.restore()
     mainWindow.focus()
   }
-})
-
-app.on('open-url', (_event, url) => {
-  handleAuthCallback(url)
 })
 
 app.whenReady().then(() => {
@@ -90,6 +60,90 @@ app.whenReady().then(() => {
   })
 
   ipcMain.handle('open-external', (_event, url: string) => shell.openExternal(url))
+
+  ipcMain.handle('open-auth-window', async (_event, url: string) => {
+    return await new Promise<{
+      ok: boolean
+      accessToken?: string
+      refreshToken?: string
+      error?: string
+    }>((resolve) => {
+      let resolved = false
+      let server: Server | null = null
+
+      // Start a local server on port 48372 that serves a page to read hash tokens
+      server = createServer((req, res) => {
+        const reqUrl = new URL(req.url ?? '/', 'http://localhost:48372')
+
+        if (reqUrl.pathname === '/auth-callback') {
+          // Serve a page that reads hash fragment and posts tokens back
+          res.writeHead(200, { 'Content-Type': 'text/html' })
+          res.end(`<html><body><script>
+            const p = new URLSearchParams(location.hash.substring(1));
+            fetch('/auth-tokens', {
+              method: 'POST',
+              headers: {'Content-Type':'application/json'},
+              body: JSON.stringify({
+                accessToken: p.get('access_token'),
+                refreshToken: p.get('refresh_token'),
+                error: p.get('error')
+              })
+            });
+          </script></body></html>`)
+        } else if (reqUrl.pathname === '/auth-tokens' && req.method === 'POST') {
+          let body = ''
+          req.on('data', (c) => {
+            body += c
+          })
+          req.on('end', () => {
+            res.writeHead(200)
+            res.end()
+            if (resolved) return
+            resolved = true
+            try {
+              const { accessToken, refreshToken, error } = JSON.parse(body)
+              if (error) {
+                resolve({ ok: false, error })
+              } else if (accessToken) {
+                resolve({ ok: true, accessToken, refreshToken })
+              } else {
+                resolve({ ok: false, error: 'No tokens returned' })
+              }
+            } catch {
+              resolve({ ok: false, error: 'Failed to parse tokens' })
+            }
+            authWindow.close()
+            server?.close()
+            server = null
+          })
+        } else {
+          res.writeHead(404)
+          res.end()
+        }
+      })
+      server.listen(48372)
+
+      const authWindow = new BrowserWindow({
+        width: 520,
+        height: 720,
+        webPreferences: {
+          nodeIntegration: false,
+          contextIsolation: true
+        }
+      })
+
+      authWindow.on('closed', () => {
+        if (!resolved) {
+          resolved = true
+          resolve({ ok: false, error: 'Auth window closed' })
+        }
+        server?.close()
+        server = null
+      })
+
+      authWindow.loadURL(url)
+    })
+  })
 
   ipcMain.on('window-minimize', () => mainWindow?.minimize())
   ipcMain.on('window-maximize', () => {

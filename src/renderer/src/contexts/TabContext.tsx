@@ -32,24 +32,27 @@ export function TabProvider({ children }: { children: React.ReactNode }): React.
     setActiveTabId(tab.id)
   }, [])
 
-  const closeTab = useCallback((id: string) => {
-    setTabs((prev) => {
-      const next = prev.filter((t) => t.id !== id)
-      return next
-    })
-    setDirtyTabs((prev) => {
-      const next = new Set(prev)
-      next.delete(id)
-      return next
-    })
-    setActiveTabId((prev) => {
-      if (prev !== id) return prev
-      // Activate adjacent tab
-      const idx = tabs.findIndex((t) => t.id === id)
-      const next = tabs[idx + 1] ?? tabs[idx - 1]
-      return next?.id ?? null
-    })
-  }, [tabs])
+  const closeTab = useCallback(
+    (id: string) => {
+      setTabs((prev) => {
+        const next = prev.filter((t) => t.id !== id)
+        return next
+      })
+      setDirtyTabs((prev) => {
+        const next = new Set(prev)
+        next.delete(id)
+        return next
+      })
+      setActiveTabId((prev) => {
+        if (prev !== id) return prev
+        // Activate adjacent tab
+        const idx = tabs.findIndex((t) => t.id === id)
+        const next = tabs[idx + 1] ?? tabs[idx - 1]
+        return next?.id ?? null
+      })
+    },
+    [tabs]
+  )
 
   const setTabDirty = useCallback((id: string, dirty: boolean) => {
     setDirtyTabs((prev) => {
@@ -66,7 +69,16 @@ export function TabProvider({ children }: { children: React.ReactNode }): React.
 
   return (
     <TabContext.Provider
-      value={{ tabs, activeTabId, dirtyTabs, openTab, closeTab, setActiveTab: setActiveTabId, setTabDirty, updateTab }}
+      value={{
+        tabs,
+        activeTabId,
+        dirtyTabs,
+        openTab,
+        closeTab,
+        setActiveTab: setActiveTabId,
+        setTabDirty,
+        updateTab
+      }}
     >
       {children}
     </TabContext.Provider>

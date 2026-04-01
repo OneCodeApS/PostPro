@@ -23,11 +23,10 @@ function escapeHtml(text: string): string {
 
 function highlightVariables(text: string): string {
   const escaped = escapeHtml(text)
-  return escaped
-    .replace(
-      /\{(\w+)\}/g,
-      '<span class="rounded px-0.5 bg-op-tertiary/20 font-bold text-op-tertiary">{$1}</span>'
-    )
+  return escaped.replace(
+    /\{(\w+)\}/g,
+    '<span class="rounded px-0.5 bg-op-tertiary/20 font-bold text-op-tertiary">{$1}</span>'
+  )
 }
 
 function highlightJson(text: string): string {
@@ -154,11 +153,14 @@ export function VariableInput({
   }
 
   function handleInput(): void {
-    if (skipNextInput.current) { skipNextInput.current = false; return }
+    if (skipNextInput.current) {
+      skipNextInput.current = false
+      return
+    }
     if (isComposing.current) return
     const el = editorRef.current
     if (!el) return
-    const text = (el.textContent ?? '')
+    const text = el.textContent ?? ''
     const caret = getCaretOffset(el)
     caretRef.current = caret
     internalValue.current = text
@@ -180,7 +182,7 @@ export function VariableInput({
   function insertVar(key: string): void {
     const el = editorRef.current
     if (!el) return
-    const text = (el.textContent ?? '')
+    const text = el.textContent ?? ''
     const cursorPos = caretRef.current
     const match = text.slice(0, cursorPos).match(/\{(\w*)$/)
     if (!match) return
@@ -219,7 +221,7 @@ export function VariableInput({
         skipNextInput.current = true
         const el = editorRef.current
         if (!el) return
-        const text = (el.textContent ?? '')
+        const text = el.textContent ?? ''
         const caret = getCaretOffset(el)
         const newText = text.slice(0, caret) + '\n' + text.slice(caret)
         const newCaret = caret + 1

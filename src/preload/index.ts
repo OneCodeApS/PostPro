@@ -35,6 +35,16 @@ const api = {
     const handler = (_: unknown, info: { percent: number }): void => cb(info)
     ipcRenderer.on('update-progress', handler)
     return () => ipcRenderer.removeListener('update-progress', handler)
+  },
+  onAuthCallback: (
+    cb: (payload: { code?: string; accessToken?: string; refreshToken?: string }) => void
+  ): (() => void) => {
+    const handler = (
+      _: unknown,
+      payload: { code?: string; accessToken?: string; refreshToken?: string }
+    ): void => cb(payload)
+    ipcRenderer.on('auth-callback', handler)
+    return () => ipcRenderer.removeListener('auth-callback', handler)
   }
 }
 

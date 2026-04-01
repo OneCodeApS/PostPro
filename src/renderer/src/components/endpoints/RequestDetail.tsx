@@ -44,7 +44,9 @@ interface ResponseState {
   time: number
 }
 
-export function RequestDetail({ requestId: propRequestId }: { requestId?: string } = {}): React.JSX.Element {
+export function RequestDetail({
+  requestId: propRequestId
+}: { requestId?: string } = {}): React.JSX.Element {
   const params_ = useParams<{ requestId: string }>()
   const requestId = propRequestId ?? params_.requestId
   const { setTabDirty, updateTab } = useTabs()

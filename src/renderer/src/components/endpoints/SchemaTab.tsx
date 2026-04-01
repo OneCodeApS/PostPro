@@ -59,9 +59,7 @@ export function SchemaTab({ schema, onChange, response }: SchemaTabProps): React
         >
           Generate from Response
         </button>
-        {!response && (
-          <span className="text-xs text-white/30">Send a request first</span>
-        )}
+        {!response && <span className="text-xs text-white/30">Send a request first</span>}
       </div>
       <div className="flex-1 p-4">
         <textarea

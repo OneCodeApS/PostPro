@@ -22,19 +22,33 @@ function LoginPage(): React.JSX.Element {
             onClick={() => window.api.windowMinimize()}
             className="flex h-8 w-10 items-center justify-center text-white/40 transition-colors hover:bg-white/10 hover:text-white"
           >
-            <svg width="10" height="1" viewBox="0 0 10 1"><rect width="10" height="1" fill="currentColor" /></svg>
+            <svg width="10" height="1" viewBox="0 0 10 1">
+              <rect width="10" height="1" fill="currentColor" />
+            </svg>
           </button>
           <button
             onClick={() => window.api.windowMaximize()}
             className="flex h-8 w-10 items-center justify-center text-white/40 transition-colors hover:bg-white/10 hover:text-white"
           >
-            <svg width="10" height="10" viewBox="0 0 10 10" fill="none" stroke="currentColor" strokeWidth="1"><rect x="0.5" y="0.5" width="9" height="9" /></svg>
+            <svg
+              width="10"
+              height="10"
+              viewBox="0 0 10 10"
+              fill="none"
+              stroke="currentColor"
+              strokeWidth="1"
+            >
+              <rect x="0.5" y="0.5" width="9" height="9" />
+            </svg>
           </button>
           <button
             onClick={() => window.api.windowClose()}
             className="flex h-8 w-10 items-center justify-center text-white/40 transition-colors hover:bg-red-500/80 hover:text-white"
           >
-            <svg width="10" height="10" viewBox="0 0 10 10" stroke="currentColor" strokeWidth="1.2"><line x1="1" y1="1" x2="9" y2="9" /><line x1="9" y1="1" x2="1" y2="9" /></svg>
+            <svg width="10" height="10" viewBox="0 0 10 10" stroke="currentColor" strokeWidth="1.2">
+              <line x1="1" y1="1" x2="9" y2="9" />
+              <line x1="9" y1="1" x2="1" y2="9" />
+            </svg>
           </button>
         </div>
       </div>
@@ -70,9 +84,7 @@ function EndpointsRoute(): React.JSX.Element {
       <div className="flex flex-1 flex-col overflow-hidden">
         <TabBar />
         <div className="relative flex-1 overflow-hidden">
-          {tabs.length === 0 && (
-            <DetailPanel selectedEnvironment={null} selectedRequest={null} />
-          )}
+          {tabs.length === 0 && <DetailPanel selectedEnvironment={null} selectedRequest={null} />}
           {tabs.map((tab) => (
             <div
               key={tab.id}

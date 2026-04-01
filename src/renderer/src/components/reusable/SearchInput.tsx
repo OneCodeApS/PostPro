@@ -1,6 +1,9 @@
 import { type InputHTMLAttributes } from 'react'
 
-interface SearchInputProps extends Omit<InputHTMLAttributes<HTMLInputElement>, 'type' | 'onChange'> {
+interface SearchInputProps extends Omit<
+  InputHTMLAttributes<HTMLInputElement>,
+  'type' | 'onChange'
+> {
   value: string
   onChange: (value: string) => void
   onClear?: () => void

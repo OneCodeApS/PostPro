@@ -29,7 +29,9 @@ export class BoardService {
   async getLinkedBoards(requestId: string): Promise<BoardWithWorkspace[]> {
     const { data, error } = await this.supabase
       .from('postpro_request_boards')
-      .select('board_id, boards(id, name, workspace_id, archived, created_at, workspaces!fk_workspace(name))')
+      .select(
+        'board_id, boards(id, name, workspace_id, archived, created_at, workspaces!fk_workspace(name))'
+      )
       .eq('request_id', requestId)
 
     if (error) {

@@ -54,9 +54,7 @@ export class EnvironmentService {
     return data
   }
 
-  async getResolvedVariables(
-    environmentId: string
-  ): Promise<{ key: string; value: string }[]> {
+  async getResolvedVariables(environmentId: string): Promise<{ key: string; value: string }[]> {
     const vars = await this.getVariables(environmentId)
     const resolved: { key: string; value: string }[] = []
     for (const v of vars) {
