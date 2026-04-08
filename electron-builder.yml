@@ -16,8 +16,11 @@ win:
   target:
     - nsis
   icon: build/icon.ico
-  sign: build/sign.cjs
   signAndEditExecutable: true
+  azureSignOptions:
+    endpoint: https://neu.codesigning.azure.net/
+    certificateProfileName: PostPro
+    codeSigningAccountName: OC-Apps
 nsis:
   oneClick: false
   allowToChangeInstallationDirectory: true
