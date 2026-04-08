@@ -66,7 +66,7 @@ function formatAndHighlight(body: string, search?: string, activeIndex?: number)
   const escaped = search.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')
   const regex = new RegExp(`(${escaped})`, 'gi')
   let matchIndex = 0
-  return highlighted.replace(/>([^<]*)</g, (fullMatch, textContent: string) => {
+  return highlighted.replace(/>([^<]*)</g, (_fullMatch, textContent: string) => {
     const replaced = textContent.replace(regex, (_m, group: string) => {
       const cls =
         matchIndex === activeIndex
@@ -231,7 +231,9 @@ export function ResponsePanel({
             <pre
               ref={bodyRef}
               className="whitespace-pre-wrap rounded bg-white/5 p-3 font-mono text-xs text-white/80 [overflow-wrap:break-word]"
-              dangerouslySetInnerHTML={{ __html: formatAndHighlight(response.body, searchQuery, searchActiveIndex) }}
+              dangerouslySetInnerHTML={{
+                __html: formatAndHighlight(response.body, searchQuery, searchActiveIndex)
+              }}
             />
           ) : (
             <table className="w-full">
