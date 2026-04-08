@@ -54,12 +54,44 @@ export function EndpointsPanel({ companyId }: EndpointsPanelProps): React.JSX.El
   const [collections, setCollections] = useState<Collection[]>([])
   const [requests, setRequests] = useState<Request[]>([])
   const [environments, setEnvironments] = useState<Map<string, Environment>>(new Map())
-  const [expandedIds, setExpandedIds] = useState<Set<string>>(new Set())
+  const [expandedIds, setExpandedIds] = useState<Set<string>>(() => {
+    try {
+      const saved = sessionStorage.getItem('postpro-expanded-folders')
+      return saved ? new Set(JSON.parse(saved)) : new Set()
+    } catch {
+      return new Set()
+    }
+  })
   const [loading, setLoading] = useState(true)
   const [contextMenu, setContextMenu] = useState<ContextMenuState | null>(null)
   const [renaming, setRenaming] = useState<RenameState | null>(null)
   const [searchQuery, setSearchQuery] = useState('')
   const [envPickerCollectionId, setEnvPickerCollectionId] = useState<string | null>(null)
+  const [dragOverCollectionId, setDragOverCollectionId] = useState<string | null>(null)
+
+  async function handleMoveRequest(requestId: string, targetCollectionId: string): Promise<void> {
+    await requestService.update(requestId, { collection_id: targetCollectionId })
+    setExpandedIds((prev) => new Set(prev).add(targetCollectionId))
+    await load()
+  }
+
+  function isDescendant(collectionId: string, potentialParentId: string): boolean {
+    let currentId: string | null = potentialParentId
+    while (currentId) {
+      if (currentId === collectionId) return true
+      const col = collections.find((c) => c.id === currentId)
+      currentId = col?.parent_collection_id ?? null
+    }
+    return false
+  }
+
+  async function handleMoveCollection(collectionId: string, targetCollectionId: string): Promise<void> {
+    if (collectionId === targetCollectionId) return
+    if (isDescendant(collectionId, targetCollectionId)) return
+    await collectionService.update(collectionId, { parent_collection_id: targetCollectionId })
+    setExpandedIds((prev) => new Set(prev).add(targetCollectionId))
+    await load()
+  }
 
   const { matchingRequestIds, visibleCollectionIds } = useMemo(() => {
     const query = searchQuery.toLowerCase().trim()
@@ -134,6 +166,7 @@ export function EndpointsPanel({ companyId }: EndpointsPanelProps): React.JSX.El
       const next = new Set(prev)
       if (next.has(id)) next.delete(id)
       else next.add(id)
+      sessionStorage.setItem('postpro-expanded-folders', JSON.stringify([...next]))
       return next
     })
   }
@@ -170,7 +203,7 @@ export function EndpointsPanel({ companyId }: EndpointsPanelProps): React.JSX.El
     })
     if (parentId) setExpandedIds((prev) => new Set(prev).add(parentId))
     await load()
-    handleStartRename('collection', newCol.id)
+    setRenaming({ id: newCol.id, type: 'collection', value: newCol.name })
   }
 
   function handleStartRename(type: 'collection' | 'request', id: string): void {
@@ -216,6 +249,24 @@ export function EndpointsPanel({ companyId }: EndpointsPanelProps): React.JSX.El
     await load()
   }
 
+  async function handleDuplicateRequest(requestId: string): Promise<void> {
+    const original = requests.find((r) => r.id === requestId)
+    if (!original) return
+    const newReq = await requestService.create({
+      collection_id: original.collection_id,
+      name: `${original.name} (copy)`,
+      method: original.method,
+      url: original.url,
+      query_params: original.query_params,
+      headers: original.headers,
+      body_type: original.body_type,
+      body: original.body ?? undefined,
+      sort_order: original.sort_order
+    })
+    await load()
+    selectRequest(newReq)
+  }
+
   async function handleCreateRequest(collectionId: string): Promise<void> {
     const newReq = await requestService.create({
       collection_id: collectionId,
@@ -230,16 +281,24 @@ export function EndpointsPanel({ companyId }: EndpointsPanelProps): React.JSX.El
     if (!contextMenu) return []
     if (contextMenu.type === 'collection') {
       const colId = contextMenu.targetId
-      return [
+      const col = collections.find((c) => c.id === colId)
+      const isRoot = !col?.parent_collection_id
+      const items: ContextMenuItem[] = [
         { label: 'New Folder', onClick: () => handleCreateFolder(colId) },
-        { label: 'New Request', onClick: () => handleCreateRequest(colId) },
-        { label: 'Set Environment', onClick: () => setEnvPickerCollectionId(colId) },
+        { label: 'New Request', onClick: () => handleCreateRequest(colId) }
+      ]
+      if (isRoot) {
+        items.push({ label: 'Set Environment', onClick: () => setEnvPickerCollectionId(colId) })
+      }
+      items.push(
         { label: 'Rename', onClick: () => handleStartRename('collection', colId) },
         { label: 'Delete', separator: true, onClick: () => handleDeleteCollection(colId) }
-      ]
+      )
+      return items
     } else {
       const reqId = contextMenu.targetId
       return [
+        { label: 'Duplicate', onClick: () => void handleDuplicateRequest(reqId) },
         { label: 'Rename', onClick: () => handleStartRename('request', reqId) },
         { label: 'Delete', separator: true, onClick: () => handleDeleteRequest(reqId) }
       ]
@@ -314,6 +373,10 @@ export function EndpointsPanel({ companyId }: EndpointsPanelProps): React.JSX.El
               onRenameFinish={handleFinishRename}
               matchingRequestIds={matchingRequestIds}
               visibleCollectionIds={visibleCollectionIds}
+              onMoveRequest={handleMoveRequest}
+              onMoveCollection={handleMoveCollection}
+              dragOverCollectionId={dragOverCollectionId}
+              setDragOverCollectionId={setDragOverCollectionId}
             />
           ))
         )}
@@ -381,7 +444,11 @@ function CollectionNode({
   onRenameChange,
   onRenameFinish,
   matchingRequestIds,
-  visibleCollectionIds
+  visibleCollectionIds,
+  onMoveRequest,
+  onMoveCollection,
+  dragOverCollectionId,
+  setDragOverCollectionId
 }: {
   collection: Collection
   depth: number
@@ -399,6 +466,10 @@ function CollectionNode({
   onRenameFinish: () => void
   matchingRequestIds: Set<string> | null
   visibleCollectionIds: Set<string> | null
+  onMoveRequest: (requestId: string, targetCollectionId: string) => Promise<void>
+  onMoveCollection: (collectionId: string, targetCollectionId: string) => Promise<void>
+  dragOverCollectionId: string | null
+  setDragOverCollectionId: (id: string | null) => void
 }): React.JSX.Element {
   const isSearching = visibleCollectionIds !== null
   const expanded = expandedIds.has(collection.id)
@@ -417,9 +488,43 @@ function CollectionNode({
   return (
     <div>
       <button
-        onClick={() => onToggle(collection.id)}
+        draggable={!!collection.parent_collection_id}
+        onDragStart={(e) => {
+          if (!collection.parent_collection_id) {
+            e.preventDefault()
+            return
+          }
+          e.dataTransfer.setData('text/collection-id', collection.id)
+          e.dataTransfer.effectAllowed = 'move'
+        }}
+        onClick={(e) => {
+          if (e.detail === 0) return // ignore synthetic clicks from drag
+          onToggle(collection.id)
+        }}
         onContextMenu={(e) => onCollectionContextMenu(e, collection.id)}
-        className="flex w-full items-center gap-2 rounded px-2 py-1.5 text-left text-sm text-white/80 transition-colors hover:bg-white/10"
+        onDragOver={(e) => {
+          e.preventDefault()
+          e.stopPropagation()
+          setDragOverCollectionId(collection.id)
+        }}
+        onDragLeave={() => setDragOverCollectionId(null)}
+        onDrop={(e) => {
+          e.preventDefault()
+          e.stopPropagation()
+          setDragOverCollectionId(null)
+          const requestId = e.dataTransfer.getData('text/request-id')
+          const colId = e.dataTransfer.getData('text/collection-id')
+          if (requestId) {
+            void onMoveRequest(requestId, collection.id)
+            return
+          }
+          if (colId) void onMoveCollection(colId, collection.id)
+        }}
+        className={`flex w-full items-center gap-2 rounded px-2 py-1.5 text-left text-sm transition-colors ${
+          dragOverCollectionId === collection.id
+            ? 'bg-op-tertiary/20 text-white'
+            : 'text-white/80 hover:bg-white/10'
+        }`}
         style={{ paddingLeft: `${depth * 16 + 8}px` }}
       >
         <svg
@@ -495,11 +600,20 @@ function CollectionNode({
               onRenameFinish={onRenameFinish}
               matchingRequestIds={matchingRequestIds}
               visibleCollectionIds={visibleCollectionIds}
+              onMoveRequest={onMoveRequest}
+              onMoveCollection={onMoveCollection}
+              dragOverCollectionId={dragOverCollectionId}
+              setDragOverCollectionId={setDragOverCollectionId}
             />
           ))}
           {requests.map((req) => (
             <button
               key={req.id}
+              draggable
+              onDragStart={(e) => {
+                e.dataTransfer.setData('text/request-id', req.id)
+                e.dataTransfer.effectAllowed = 'move'
+              }}
               onClick={() => onSelectRequest(req)}
               onContextMenu={(e) => onRequestContextMenu(e, req.id)}
               className={`flex w-full items-center gap-2 rounded px-2 py-1.5 text-left text-sm transition-colors ${

@@ -33,7 +33,7 @@ export class CollectionService {
 
   async update(
     id: string,
-    updates: Partial<Pick<Collection, 'name' | 'description' | 'environment_id'>>
+    updates: Partial<Pick<Collection, 'name' | 'description' | 'environment_id' | 'parent_collection_id'>>
   ): Promise<Collection> {
     const { data, error } = await this.supabase
       .from('postpro_collections')

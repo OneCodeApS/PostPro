@@ -1,4 +1,5 @@
 import { useState, useRef, type PointerEvent as ReactPointerEvent } from 'react'
+import { ResponseSearch } from './ResponseSearch'
 
 interface ResponseState {
   status: number
@@ -46,13 +47,37 @@ function highlightJson(text: string): string {
   return result
 }
 
-function formatAndHighlight(body: string): string {
+function formatAndHighlight(body: string, search?: string, activeIndex?: number): string {
+  let formatted: string
   try {
-    const formatted = JSON.stringify(JSON.parse(body), null, 2)
-    return highlightJson(formatted)
+    formatted = JSON.stringify(JSON.parse(body), null, 2)
   } catch {
-    return escapeHtml(body)
+    formatted = body
   }
+
+  if (!search) {
+    return highlightJson(formatted)
+  }
+
+  // First apply JSON syntax highlighting
+  const highlighted = highlightJson(formatted)
+
+  // Then apply search highlighting on the visible text by working on the HTML
+  const escaped = search.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')
+  const regex = new RegExp(`(${escaped})`, 'gi')
+  let matchIndex = 0
+  return highlighted.replace(/>([^<]*)</g, (fullMatch, textContent: string) => {
+    const replaced = textContent.replace(regex, (_m, group: string) => {
+      const cls =
+        matchIndex === activeIndex
+          ? 'bg-op-tertiary/60 text-white rounded px-0.5'
+          : 'bg-yellow-500/30 text-white rounded px-0.5'
+      const result = `</span><mark class="${cls}">${escapeHtml(group)}</mark><span>`
+      matchIndex++
+      return result
+    })
+    return `>${replaced}<`
+  })
 }
 
 function formatSize(bytes: number): string {
@@ -69,6 +94,9 @@ export function ResponsePanel({
   const [height, setHeight] = useState(500)
   const [copied, setCopied] = useState(false)
   const [activeTab, setActiveTab] = useState<ResponseTab>('body')
+  const [searchQuery, setSearchQuery] = useState('')
+  const [searchActiveIndex, setSearchActiveIndex] = useState(0)
+  const bodyRef = useRef<HTMLPreElement>(null)
   const dragging = useRef(false)
   const startY = useRef(0)
   const startH = useRef(0)
@@ -162,6 +190,17 @@ export function ResponsePanel({
         </div>
       )}
 
+      {response && activeTab === 'body' && (
+        <ResponseSearch
+          body={response.body}
+          bodyRef={bodyRef}
+          onHighlight={(search, activeIndex) => {
+            setSearchQuery(search)
+            setSearchActiveIndex(activeIndex)
+          }}
+        />
+      )}
+
       <div className="flex-1 overflow-y-auto overflow-x-hidden px-4 pb-4">
         {sending ? (
           <div className="flex h-full items-center justify-center gap-2 text-xs text-white/40">
@@ -190,8 +229,9 @@ export function ResponsePanel({
         ) : response ? (
           activeTab === 'body' ? (
             <pre
+              ref={bodyRef}
               className="whitespace-pre-wrap rounded bg-white/5 p-3 font-mono text-xs text-white/80 [overflow-wrap:break-word]"
-              dangerouslySetInnerHTML={{ __html: formatAndHighlight(response.body) }}
+              dangerouslySetInnerHTML={{ __html: formatAndHighlight(response.body, searchQuery, searchActiveIndex) }}
             />
           ) : (
             <table className="w-full">

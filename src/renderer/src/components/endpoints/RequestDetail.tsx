@@ -129,16 +129,24 @@ export function RequestDetail({
 
     setRequest(data)
 
-    // Load environment variables from the request's collection
+    // Load environment variables from the request's collection (walk up parent chain)
     if (data.collection_id) {
-      const { data: col } = await supabase
-        .from('postpro_collections')
-        .select('environment_id')
-        .eq('id', data.collection_id)
-        .single()
-
-      if (col?.environment_id) {
-        const vars = await environmentService.getVariables(col.environment_id)
+      let envId: string | null = null
+      let currentId: string | null = data.collection_id
+      while (currentId && !envId) {
+        const { data: col } = await supabase
+          .from('postpro_collections')
+          .select('environment_id, parent_collection_id')
+          .eq('id', currentId)
+          .single()
+        if (col?.environment_id) {
+          envId = col.environment_id
+        } else {
+          currentId = col?.parent_collection_id ?? null
+        }
+      }
+      if (envId) {
+        const vars = await environmentService.getVariables(envId)
         setEnvVariables(vars)
       } else {
         setEnvVariables([])
@@ -234,16 +242,25 @@ export function RequestDetail({
     // Save before sending
     await handleSave()
 
-    // Resolve all variables including secrets from vault
+    // Resolve all variables including secrets from vault (walk up parent chain)
     let resolvedVars: { key: string; value: string }[] = []
     if (request?.collection_id) {
-      const { data: col } = await supabase
-        .from('postpro_collections')
-        .select('environment_id')
-        .eq('id', request.collection_id)
-        .single()
-      if (col?.environment_id) {
-        resolvedVars = await environmentService.getResolvedVariables(col.environment_id)
+      let envId: string | null = null
+      let currentId: string | null = request.collection_id
+      while (currentId && !envId) {
+        const { data: col } = await supabase
+          .from('postpro_collections')
+          .select('environment_id, parent_collection_id')
+          .eq('id', currentId)
+          .single()
+        if (col?.environment_id) {
+          envId = col.environment_id
+        } else {
+          currentId = col?.parent_collection_id ?? null
+        }
+      }
+      if (envId) {
+        resolvedVars = await environmentService.getResolvedVariables(envId)
       }
     }
 

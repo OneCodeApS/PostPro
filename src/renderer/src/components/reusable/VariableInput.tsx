@@ -1,5 +1,6 @@
 import { useRef, useState, useEffect } from 'react'
 import { createPortal } from 'react-dom'
+import { Tooltip } from './Tooltip'
 
 interface Variable {
   key: string
@@ -21,15 +22,16 @@ function escapeHtml(text: string): string {
   return text.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;')
 }
 
-function highlightVariables(text: string): string {
+function highlightVariables(text: string, variables?: Variable[]): string {
   const escaped = escapeHtml(text)
-  return escaped.replace(
-    /\{(\w+)\}/g,
-    '<span class="rounded px-0.5 bg-op-tertiary/20 font-bold text-op-tertiary">{$1}</span>'
-  )
+  return escaped.replace(/\{(\w+)\}/g, (_match, key) => {
+    const v = variables?.find((vr) => vr.key === key)
+    const tooltip = v ? (v.is_secret ? '*******' : escapeHtml(v.value ?? '')) : ''
+    return `<span class="rounded px-0.5 bg-op-tertiary/20 font-bold text-op-tertiary" data-tooltip="${tooltip}">{${escapeHtml(key)}}</span>`
+  })
 }
 
-function highlightJson(text: string): string {
+function highlightJson(text: string, variables?: Variable[]): string {
   // Tokenize JSON with a single regex that matches tokens in order
   const token =
     /(\{(\w+)\})|("(?:[^"\\]|\\.)*")\s*(?=:)|("(?:[^"\\]|\\.)*")|\b(-?\d+(?:\.\d+)?(?:[eE][+-]?\d+)?)\b|\b(true|false|null)\b|([{}[\]:,])|(\n)|(.)/g
@@ -39,7 +41,10 @@ function highlightJson(text: string): string {
   while ((m = token.exec(text)) !== null) {
     if (m[1]) {
       // Variable {word}
-      result += `<span class="rounded px-0.5 bg-op-tertiary/20 font-bold text-op-tertiary">${escapeHtml(m[1])}</span>`
+      const key = m[2]
+      const v = variables?.find((vr) => vr.key === key)
+      const tooltip = v ? (v.is_secret ? '*******' : escapeHtml(v.value ?? '')) : ''
+      result += `<span class="rounded px-0.5 bg-op-tertiary/20 font-bold text-op-tertiary" data-tooltip="${tooltip}">${escapeHtml(m[1])}</span>`
     } else if (m[3]) {
       // JSON key (string followed by colon)
       result += `<span class="text-blue-400">${escapeHtml(m[3])}</span>`
@@ -119,7 +124,8 @@ export function VariableInput({
   multiline = false,
   syntax
 }: VariableInputProps): React.JSX.Element {
-  const highlight = syntax === 'json' ? highlightJson : highlightVariables
+  const highlight = (text: string): string =>
+    syntax === 'json' ? highlightJson(text, variables) : highlightVariables(text, variables)
 
   const editorRef = useRef<HTMLDivElement>(null)
   const [dropdown, setDropdown] = useState<{ query: string; rect: DOMRect } | null>(null)
@@ -144,6 +150,18 @@ export function VariableInput({
     internalValue.current = value
     el.innerHTML = value ? highlight(value) : ''
   }, [value])
+
+  // Re-highlight when variables change (e.g. loaded async) to update tooltips
+  const prevVariables = useRef(variables)
+  useEffect(() => {
+    if (prevVariables.current === variables) return
+    prevVariables.current = variables
+    const el = editorRef.current
+    if (!el || !internalValue.current) return
+    const caret = getCaretOffset(el)
+    el.innerHTML = highlight(internalValue.current)
+    setCaretOffset(el, caret)
+  }, [variables])
 
   function applyHighlight(text: string, caret: number): void {
     const el = editorRef.current
@@ -268,6 +286,7 @@ export function VariableInput({
   }
 
   return (
+    <Tooltip>
     <div className={`relative ${multiline ? 'h-full' : 'min-w-0 flex-1'}`}>
       <div
         ref={editorRef}
@@ -326,5 +345,6 @@ export function VariableInput({
           document.body
         )}
     </div>
+    </Tooltip>
   )
 }
