@@ -20,7 +20,7 @@ win:
 nsis:
   oneClick: false
   allowToChangeInstallationDirectory: true
-  artifactName: PostPro-${version}-setup.${ext}
+  artifactName: PostPro-setup.${ext}
   shortcutName: PostPro
   uninstallDisplayName: PostPro
   createDesktopShortcut: always
