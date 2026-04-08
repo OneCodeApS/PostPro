@@ -23,8 +23,19 @@ jobs:
       - name: Build app
         run: npm run build
 
+      - name: Install Azure Sign Tool
+        run: dotnet tool install --global AzureSignTool
+
       - name: Package installer
         run: npx electron-builder --win --publish never
+        env:
+          AZURE_SIGN_TOOL_PATH: AzureSignTool
+          AZURE_ENDPOINT: https://neu.codesigning.azure.net/
+          AZURE_CODE_SIGNING_ACCOUNT: OC-Apps
+          AZURE_CERT_PROFILE: PostPro
+          AZURE_CLIENT_ID: ${{ secrets.AZURE_CLIENT_ID }}
+          AZURE_CLIENT_SECRET: ${{ secrets.AZURE_CLIENT_SECRET }}
+          AZURE_TENANT_ID: ${{ secrets.AZURE_TENANT_ID }}
 
       - name: Upload installer
         uses: actions/upload-artifact@v4
