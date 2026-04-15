@@ -8,6 +8,7 @@ const STORAGE_KEY = `sb-${new URL(supabaseUrl).hostname.split('.')[0]}-auth-toke
 export const supabase = createClient(supabaseUrl, supabaseAnonKey, {
   auth: {
     flowType: 'implicit',
+    detectSessionInUrl: false,
     lock: async (_name, _acquireTimeout, fn) => await fn()
   }
 })

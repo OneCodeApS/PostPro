@@ -20,11 +20,21 @@ export function AuthProvider({ children }: { children: React.ReactNode }): React
 
   useEffect(() => {
     console.log('AuthProvider: starting getSession...')
+
+    let settled = false
+    const timeout = setTimeout(() => {
+      if (!settled) {
+        console.warn('AuthProvider: getSession() timed out, reloading...')
+        window.location.reload()
+      }
+    }, 5000)
+
     supabase.auth
       .getSession()
       .then(async ({ data: { session } }) => {
+        settled = true
+        clearTimeout(timeout)
         console.log('AuthProvider: got session', session ? 'logged in' : 'no session')
-        console.log('AuthProvider: session data', session)
         setSession(session)
         if (session?.user) {
           const { data, error } = await supabase
@@ -36,7 +46,11 @@ export function AuthProvider({ children }: { children: React.ReactNode }): React
           setCompanyId(data?.current_company_id ?? null)
         }
       })
-      .catch((err) => console.error('Auth init error:', err))
+      .catch((err) => {
+        settled = true
+        clearTimeout(timeout)
+        console.error('Auth init error:', err)
+      })
       .finally(() => setLoading(false))
 
     const {
@@ -56,8 +70,27 @@ export function AuthProvider({ children }: { children: React.ReactNode }): React
       setLoading(false)
     })
 
+    // Proactively refresh session when the app regains focus
+    function handleVisibility(): void {
+      if (document.visibilityState === 'visible') {
+        supabase.auth.refreshSession().catch((err) => {
+          console.error('Session refresh on focus failed:', err)
+        })
+      }
+    }
+    document.addEventListener('visibilitychange', handleVisibility)
+
+    // Safety net: refresh session every 10 minutes regardless of visibility
+    const refreshInterval = setInterval(() => {
+      supabase.auth.refreshSession().catch((err) => {
+        console.error('Periodic session refresh failed:', err)
+      })
+    }, 10 * 60 * 1000)
+
     return () => {
       subscription.unsubscribe()
+      document.removeEventListener('visibilitychange', handleVisibility)
+      clearInterval(refreshInterval)
     }
   }, [])
 

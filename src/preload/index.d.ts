@@ -17,6 +17,7 @@ declare global {
         time?: number
         error?: string
       }>
+      checkForUpdates: () => void
       windowMinimize: () => void
       windowMaximize: () => void
       windowClose: () => void

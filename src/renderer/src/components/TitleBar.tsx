@@ -1,5 +1,6 @@
 import { useRef, useEffect, useState } from 'react'
 import { useAuth } from '../contexts/AuthContext'
+import { HelpMenu } from './HelpMenu'
 
 type UpdateState = 'idle' | 'available' | 'downloading' | 'ready'
 
@@ -153,6 +154,7 @@ export function TitleBar(): React.JSX.Element {
       {/* Non-draggable controls */}
       <div className="flex items-center gap-2 px-2 [-webkit-app-region:no-drag]">
         <UpdateBadge />
+        <HelpMenu />
         <UserMenu />
         <WindowControls />
       </div>

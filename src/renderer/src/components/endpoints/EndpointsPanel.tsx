@@ -7,7 +7,7 @@ import { EnvironmentService } from '../../services/EnvironmentService'
 import { ContextMenu, type ContextMenuItem } from '../reusable/ContextMenu'
 import { Modal } from '../reusable/Modal'
 import { SearchInput } from '../reusable/SearchInput'
-import { useTabs } from '../../contexts/TabContext'
+import { useTabs, type Tab } from '../../contexts/TabContext'
 import type { Collection, Request, Environment } from '../../types'
 
 const METHOD_COLORS: Record<string, string> = {
@@ -45,7 +45,7 @@ interface EndpointsPanelProps {
 export function EndpointsPanel({ companyId }: EndpointsPanelProps): React.JSX.Element {
   const navigate = useNavigate()
   const { requestId: selectedRequestId } = useParams()
-  const { openTab, activeTabId } = useTabs()
+  const { tabs, openTab, activeTabId } = useTabs()
 
   function selectRequest(req: Request): void {
     openTab({ id: req.id, name: req.name, method: req.method || 'GET' })
@@ -377,6 +377,7 @@ export function EndpointsPanel({ companyId }: EndpointsPanelProps): React.JSX.El
               onMoveCollection={handleMoveCollection}
               dragOverCollectionId={dragOverCollectionId}
               setDragOverCollectionId={setDragOverCollectionId}
+              openTabs={tabs}
             />
           ))
         )}
@@ -448,7 +449,8 @@ function CollectionNode({
   onMoveRequest,
   onMoveCollection,
   dragOverCollectionId,
-  setDragOverCollectionId
+  setDragOverCollectionId,
+  openTabs
 }: {
   collection: Collection
   depth: number
@@ -470,6 +472,7 @@ function CollectionNode({
   onMoveCollection: (collectionId: string, targetCollectionId: string) => Promise<void>
   dragOverCollectionId: string | null
   setDragOverCollectionId: (id: string | null) => void
+  openTabs: Tab[]
 }): React.JSX.Element {
   const isSearching = visibleCollectionIds !== null
   const expanded = expandedIds.has(collection.id)
@@ -604,9 +607,14 @@ function CollectionNode({
               onMoveCollection={onMoveCollection}
               dragOverCollectionId={dragOverCollectionId}
               setDragOverCollectionId={setDragOverCollectionId}
+              openTabs={openTabs}
             />
           ))}
-          {requests.map((req) => (
+          {requests.map((req) => {
+            const tabMethod = openTabs.find((t) => t.id === req.id)?.method
+            const displayMethod = tabMethod ?? req.method
+
+            return (
             <button
               key={req.id}
               draggable
@@ -624,9 +632,9 @@ function CollectionNode({
               style={{ paddingLeft: `${(depth + 1) * 16 + 8}px` }}
             >
               <span
-                className={`w-12 shrink-0 text-xs font-bold ${METHOD_COLORS[req.method] ?? 'text-white/50'}`}
+                className={`w-12 shrink-0 text-xs font-bold ${METHOD_COLORS[displayMethod] ?? 'text-white/50'}`}
               >
-                {req.method}
+                {displayMethod}
               </span>
               {renaming?.id === req.id ? (
                 <input
@@ -645,7 +653,8 @@ function CollectionNode({
                 <span className="truncate">{req.name}</span>
               )}
             </button>
-          ))}
+            )
+          })}
         </div>
       )}
     </div>

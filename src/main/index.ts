@@ -145,6 +145,8 @@ app.whenReady().then(() => {
     })
   })
 
+  ipcMain.on('check-for-updates', () => autoUpdater.checkForUpdates())
+
   ipcMain.on('window-minimize', () => mainWindow?.minimize())
   ipcMain.on('window-maximize', () => {
     if (mainWindow?.isMaximized()) {

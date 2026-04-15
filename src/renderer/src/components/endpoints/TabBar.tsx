@@ -1,6 +1,8 @@
 import { useState, useEffect, useRef } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { useTabs } from '../../contexts/TabContext'
+import { Modal } from '../reusable/Modal'
+import { Button } from '../reusable/Button'
 
 const METHOD_COLORS: Record<string, string> = {
   GET: 'text-green-400',
@@ -22,6 +24,7 @@ export function TabBar(): React.JSX.Element | null {
   const { tabs, activeTabId, dirtyTabs, setActiveTab, closeTab } = useTabs()
   const navigate = useNavigate()
   const [contextMenu, setContextMenu] = useState<ContextMenuState | null>(null)
+  const [confirmClose, setConfirmClose] = useState<string | null>(null)
   const menuRef = useRef<HTMLDivElement>(null)
 
   useEffect(() => {
@@ -41,6 +44,14 @@ export function TabBar(): React.JSX.Element | null {
   }
 
   function handleCloseTab(id: string): void {
+    if (dirtyTabs.has(id)) {
+      setConfirmClose(id)
+      return
+    }
+    forceCloseTab(id)
+  }
+
+  function forceCloseTab(id: string): void {
     const idx = tabs.findIndex((t) => t.id === id)
     const next = tabs[idx + 1] ?? tabs[idx - 1]
     closeTab(id)
@@ -166,6 +177,37 @@ export function TabBar(): React.JSX.Element | null {
             Close All Saved
           </button>
         </div>
+      )}
+
+      {confirmClose && (
+        <Modal title="Unsaved changes" onClose={() => setConfirmClose(null)}>
+          <p className="mb-4 text-sm text-white/70">
+            This tab has unsaved changes. Do you want to save before closing?
+          </p>
+          <div className="flex justify-end gap-2">
+            <Button
+              variant="secondary"
+              size="sm"
+              onClick={() => {
+                forceCloseTab(confirmClose)
+                setConfirmClose(null)
+              }}
+            >
+              Discard
+            </Button>
+            <Button
+              variant="tertiary"
+              size="sm"
+              onClick={() => {
+                handleSaveTab(confirmClose)
+                forceCloseTab(confirmClose)
+                setConfirmClose(null)
+              }}
+            >
+              Save & Close
+            </Button>
+          </div>
+        </Modal>
       )}
     </>
   )

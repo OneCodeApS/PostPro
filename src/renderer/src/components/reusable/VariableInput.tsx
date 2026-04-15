@@ -128,6 +128,7 @@ export function VariableInput({
     syntax === 'json' ? highlightJson(text, variables) : highlightVariables(text, variables)
 
   const editorRef = useRef<HTMLDivElement>(null)
+  const dropdownRef = useRef<HTMLDivElement>(null)
   const [dropdown, setDropdown] = useState<{ query: string; rect: DOMRect } | null>(null)
   const [highlightedIndex, setHighlightedIndex] = useState(0)
   const caretRef = useRef<number>(0)
@@ -137,7 +138,10 @@ export function VariableInput({
 
   useEffect(() => {
     if (!dropdown) return
-    const close = (): void => setDropdown(null)
+    const close = (e: Event): void => {
+      if (dropdownRef.current?.contains(e.target as Node)) return
+      setDropdown(null)
+    }
     window.addEventListener('scroll', close, true)
     return () => window.removeEventListener('scroll', close, true)
   }, [dropdown])
@@ -313,13 +317,14 @@ export function VariableInput({
         dropdown &&
         createPortal(
           <div
+            ref={dropdownRef}
             style={{
               position: 'fixed',
               top: dropdown.rect.bottom + 2,
               left: dropdown.rect.left,
               zIndex: 9999
             }}
-            className="max-h-32 w-56 overflow-y-auto rounded-lg border border-white/10 bg-op-primary shadow-lg"
+            className="max-h-32 w-80 overflow-y-auto rounded-lg border border-white/10 bg-op-primary shadow-lg"
           >
             {dropdownMatches.map((v, i) => (
               <button

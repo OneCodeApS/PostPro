@@ -1,9 +1,17 @@
-import { createContext, useContext, useState, useCallback } from 'react'
+import { createContext, useContext, useState, useCallback, useRef } from 'react'
 
 export interface Tab {
   id: string
   name: string
   method: string
+}
+
+export interface CachedResponse {
+  status: number
+  statusText: string
+  headers: Record<string, string>
+  body: string
+  time: number
 }
 
 interface TabContextValue {
@@ -15,6 +23,8 @@ interface TabContextValue {
   setActiveTab: (id: string) => void
   setTabDirty: (id: string, dirty: boolean) => void
   updateTab: (id: string, updates: Partial<Pick<Tab, 'name' | 'method'>>) => void
+  getResponse: (id: string) => { response: CachedResponse | null; error: string | null }
+  setResponse: (id: string, response: CachedResponse | null, error: string | null) => void
 }
 
 const TabContext = createContext<TabContextValue | null>(null)
@@ -23,6 +33,7 @@ export function TabProvider({ children }: { children: React.ReactNode }): React.
   const [tabs, setTabs] = useState<Tab[]>([])
   const [activeTabId, setActiveTabId] = useState<string | null>(null)
   const [dirtyTabs, setDirtyTabs] = useState<Set<string>>(new Set())
+  const responseCache = useRef<Map<string, { response: CachedResponse | null; error: string | null }>>(new Map())
 
   const openTab = useCallback((tab: Tab) => {
     setTabs((prev) => {
@@ -43,6 +54,7 @@ export function TabProvider({ children }: { children: React.ReactNode }): React.
         next.delete(id)
         return next
       })
+      responseCache.current.delete(id)
       setActiveTabId((prev) => {
         if (prev !== id) return prev
         // Activate adjacent tab
@@ -67,6 +79,14 @@ export function TabProvider({ children }: { children: React.ReactNode }): React.
     setTabs((prev) => prev.map((t) => (t.id === id ? { ...t, ...updates } : t)))
   }, [])
 
+  const getResponse = useCallback((id: string) => {
+    return responseCache.current.get(id) ?? { response: null, error: null }
+  }, [])
+
+  const setResponseCached = useCallback((id: string, response: CachedResponse | null, error: string | null) => {
+    responseCache.current.set(id, { response, error })
+  }, [])
+
   return (
     <TabContext.Provider
       value={{
@@ -77,7 +97,9 @@ export function TabProvider({ children }: { children: React.ReactNode }): React.
         closeTab,
         setActiveTab: setActiveTabId,
         setTabDirty,
-        updateTab
+        updateTab,
+        getResponse,
+        setResponse: setResponseCached
       }}
     >
       {children}
