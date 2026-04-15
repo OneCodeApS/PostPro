@@ -26,7 +26,6 @@ jobs:
         env:
           VITE_SUPABASE_URL: ${{ secrets.VITE_SUPABASE_URL }}
           VITE_SUPABASE_ANON_KEY: ${{ secrets.VITE_SUPABASE_ANON_KEY }}
-          MAIN_VITE_UPDATE_TOKEN: ${{ secrets.UPDATE_TOKEN }}
 
       - name: Package installer
         run: npx electron-builder --win --publish never

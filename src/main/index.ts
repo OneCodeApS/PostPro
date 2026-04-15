@@ -192,9 +192,6 @@ app.whenReady().then(() => {
 
   // Auto-updater
   autoUpdater.autoDownload = false
-  if (process.env.MAIN_VITE_UPDATE_TOKEN) {
-    autoUpdater.requestHeaders = { Authorization: `token ${process.env.MAIN_VITE_UPDATE_TOKEN}` }
-  }
   autoUpdater.checkForUpdates().catch((err) => {
     console.error('Update check failed:', err)
   })
