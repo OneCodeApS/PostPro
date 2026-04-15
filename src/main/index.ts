@@ -57,6 +57,17 @@ app.whenReady().then(() => {
 
   app.on('browser-window-created', (_, window) => {
     optimizer.watchWindowShortcuts(window)
+
+    window.webContents.on('before-input-event', (event, input) => {
+      if (input.key === 'F12') {
+        window.webContents.toggleDevTools()
+        event.preventDefault()
+      }
+      if (input.key === 'F5' || (input.control && input.key === 'r')) {
+        window.webContents.reload()
+        event.preventDefault()
+      }
+    })
   })
 
   ipcMain.handle('open-external', (_event, url: string) => shell.openExternal(url))
@@ -210,6 +221,10 @@ app.whenReady().then(() => {
     mainWindow?.webContents.send('update-progress', {
       percent: Math.round(progress.percent)
     })
+  })
+
+  autoUpdater.on('error', (err) => {
+    mainWindow?.webContents.send('update-error', err.message ?? 'Unknown update error')
   })
 
   ipcMain.on('download-update', () => {

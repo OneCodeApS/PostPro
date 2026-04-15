@@ -2,12 +2,13 @@ import { useRef, useEffect, useState } from 'react'
 import { useAuth } from '../contexts/AuthContext'
 import { HelpMenu } from './HelpMenu'
 
-type UpdateState = 'idle' | 'available' | 'downloading' | 'ready'
+type UpdateState = 'idle' | 'available' | 'downloading' | 'ready' | 'error'
 
 function UpdateBadge(): React.JSX.Element | null {
   const [state, setState] = useState<UpdateState>('idle')
   const [version, setVersion] = useState('')
   const [progress, setProgress] = useState(0)
+  const [error, setError] = useState('')
 
   useEffect(() => {
     const off1 = window.api.onUpdateAvailable((info) => {
@@ -20,10 +21,15 @@ function UpdateBadge(): React.JSX.Element | null {
     const off3 = window.api.onUpdateProgress((info) => {
       setProgress(info.percent)
     })
+    const off4 = window.api.onUpdateError((message) => {
+      setError(message)
+      setState('error')
+    })
     return () => {
       off1()
       off2()
       off3()
+      off4()
     }
   }, [])
 
@@ -48,6 +54,23 @@ function UpdateBadge(): React.JSX.Element | null {
       <span className="rounded bg-white/10 px-2 py-0.5 text-xs text-white/50">
         Downloading {progress}%
       </span>
+    )
+  }
+
+  if (state === 'error') {
+    return (
+      <button
+        onClick={() => {
+          setError('')
+          setProgress(0)
+          setState('downloading')
+          window.api.downloadUpdate()
+        }}
+        className="rounded bg-red-500/20 px-2 py-0.5 text-xs font-medium text-red-400 transition-colors hover:bg-red-500/30"
+        title={error}
+      >
+        Update failed – retry
+      </button>
     )
   }
 

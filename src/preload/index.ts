@@ -37,6 +37,11 @@ const api = {
     ipcRenderer.on('update-progress', handler)
     return () => ipcRenderer.removeListener('update-progress', handler)
   },
+  onUpdateError: (cb: (message: string) => void): (() => void) => {
+    const handler = (_: unknown, message: string): void => cb(message)
+    ipcRenderer.on('update-error', handler)
+    return () => ipcRenderer.removeListener('update-error', handler)
+  },
   onAuthCallback: (
     cb: (payload: { code?: string; accessToken?: string; refreshToken?: string }) => void
   ): (() => void) => {
