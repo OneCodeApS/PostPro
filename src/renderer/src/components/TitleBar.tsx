@@ -144,11 +144,20 @@ function WindowControls(): React.JSX.Element {
 }
 
 export function TitleBar(): React.JSX.Element {
+  const [appVersion, setAppVersion] = useState('')
+
+  useEffect(() => {
+    window.api.getAppVersion().then(setAppVersion)
+  }, [])
+
   return (
     <div className="flex h-10 shrink-0 items-center border-b border-white/10 bg-op-primary">
       {/* Drag region */}
       <div className="flex flex-1 items-center px-4 [-webkit-app-region:drag]">
         <h1 className="text-sm font-bold text-white">PostPro</h1>
+        {appVersion && (
+          <span className="ml-2 text-xs text-white/40">v{appVersion}</span>
+        )}
       </div>
 
       {/* Non-draggable controls */}
