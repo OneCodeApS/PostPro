@@ -21,7 +21,7 @@ win:
     endpoint: https://neu.codesigning.azure.net/
     certificateProfileName: PostPro
     codeSigningAccountName: OC-Apps
-    publisherName: onecode.dk
+    publisherName: Onecode ApS
 nsis:
   oneClick: false
   allowToChangeInstallationDirectory: true
