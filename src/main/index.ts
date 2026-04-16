@@ -224,6 +224,7 @@ app.whenReady().then(() => {
   })
 
   autoUpdater.on('error', (err) => {
+    console.error('Auto-update error:', err)
     mainWindow?.webContents.send('update-error', err.message ?? 'Unknown update error')
   })
 

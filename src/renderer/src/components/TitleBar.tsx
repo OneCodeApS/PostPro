@@ -22,6 +22,7 @@ function UpdateBadge(): React.JSX.Element | null {
       setProgress(info.percent)
     })
     const off4 = window.api.onUpdateError((message) => {
+      console.error('Update error:', message)
       setError(message)
       setState('error')
     })
