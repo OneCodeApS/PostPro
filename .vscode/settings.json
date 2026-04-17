@@ -7,5 +7,14 @@
   },
   "[json]": {
     "editor.defaultFormatter": "esbenp.prettier-vscode"
+  },
+  "workbench.colorCustomizations": {
+    "titleBar.activeBackground": "#024972",
+    "titleBar.inactiveBackground": "#0C4565",
+    "titleBar.activeForeground": "#FFFFFF",
+    "titleBar.inactiveForeground": "#CCCCCC",
+    "activityBar.background": "#024972",
+    "activityBar.foreground": "#FFFFFF",
+    "activityBar.inactiveForeground": "#CCCCCC"
   }
 }

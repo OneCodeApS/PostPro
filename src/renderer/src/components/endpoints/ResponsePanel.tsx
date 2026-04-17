@@ -1,4 +1,4 @@
-import { useState, useRef, type PointerEvent as ReactPointerEvent } from 'react'
+import { useState, useRef, useMemo, type PointerEvent as ReactPointerEvent } from 'react'
 import { ResponseSearch } from './ResponseSearch'
 
 interface ResponseState {
@@ -16,6 +16,10 @@ interface ResponsePanelProps {
   responseError: string | null
   sending?: boolean
 }
+
+// Responses larger than this get truncated rendering (syntax highlighting skipped)
+const HIGHLIGHT_LIMIT = 200_000 // 200 KB — skip syntax highlighting above this
+const RENDER_LIMIT = 500_000 // 500 KB — truncate display above this
 
 function escapeHtml(text: string): string {
   return text.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;')
@@ -53,6 +57,11 @@ function formatAndHighlight(body: string, search?: string, activeIndex?: number)
     formatted = JSON.stringify(JSON.parse(body), null, 2)
   } catch {
     formatted = body
+  }
+
+  // Skip syntax highlighting for large bodies to prevent main-thread freeze
+  if (formatted.length > HIGHLIGHT_LIMIT) {
+    return escapeHtml(formatted)
   }
 
   if (!search) {
@@ -96,6 +105,7 @@ export function ResponsePanel({
   const [activeTab, setActiveTab] = useState<ResponseTab>('body')
   const [searchQuery, setSearchQuery] = useState('')
   const [searchActiveIndex, setSearchActiveIndex] = useState(0)
+  const [showFullBody, setShowFullBody] = useState(false)
   const bodyRef = useRef<HTMLPreElement>(null)
   const dragging = useRef(false)
   const startY = useRef(0)
@@ -118,7 +128,27 @@ export function ResponsePanel({
     dragging.current = false
   }
 
-  const bodySize = response ? new Blob([response.body]).size : 0
+  const bodySize = useMemo(() => (response ? new Blob([response.body]).size : 0), [response?.body])
+  const isTruncated = response ? response.body.length > RENDER_LIMIT && !showFullBody : false
+  const displayBody = useMemo(() => {
+    if (!response) return ''
+    if (isTruncated) return response.body.slice(0, RENDER_LIMIT)
+    return response.body
+  }, [response?.body, isTruncated])
+
+  // Memoize the expensive formatting so it only re-runs when inputs change
+  const formattedLines = useMemo(() => {
+    if (!response) return []
+    const html = formatAndHighlight(displayBody, searchQuery, searchActiveIndex)
+    return html.split('\n')
+  }, [displayBody, searchQuery, searchActiveIndex])
+
+  // Reset truncation toggle when response changes
+  const prevBody = useRef(response?.body)
+  if (response?.body !== prevBody.current) {
+    prevBody.current = response?.body
+    if (showFullBody) setShowFullBody(false)
+  }
 
   return (
     <div className="flex flex-col border-t border-white/10" style={{ height, minHeight: 40 }}>
@@ -151,13 +181,16 @@ export function ResponsePanel({
             <span className="text-xs text-white/40">{formatSize(bodySize)}</span>
             <button
               onClick={() => {
-                const formatted = (() => {
+                let formatted: string
+                if (response.body.length > HIGHLIGHT_LIMIT) {
+                  formatted = response.body // skip re-parse for large bodies
+                } else {
                   try {
-                    return JSON.stringify(JSON.parse(response.body), null, 2)
+                    formatted = JSON.stringify(JSON.parse(response.body), null, 2)
                   } catch {
-                    return response.body
+                    formatted = response.body
                   }
-                })()
+                }
                 navigator.clipboard.writeText(formatted)
                 setCopied(true)
                 setTimeout(() => setCopied(false), 1500)
@@ -228,13 +261,41 @@ export function ResponsePanel({
           </div>
         ) : response ? (
           activeTab === 'body' ? (
-            <pre
-              ref={bodyRef}
-              className="whitespace-pre-wrap rounded bg-white/5 p-3 font-mono text-xs text-white/80 [overflow-wrap:break-word]"
-              dangerouslySetInnerHTML={{
-                __html: formatAndHighlight(response.body, searchQuery, searchActiveIndex)
-              }}
-            />
+            <div>
+              {response.body.length > HIGHLIGHT_LIMIT && (
+                <div className="mb-2 flex items-center gap-2 rounded bg-yellow-500/10 px-3 py-1.5 text-xs text-yellow-400/80">
+                  <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M10.29 3.86L1.82 18a2 2 0 001.71 3h16.94a2 2 0 001.71-3L13.71 3.86a2 2 0 00-3.42 0z"/><line x1="12" y1="9" x2="12" y2="13"/><line x1="12" y1="17" x2="12.01" y2="17"/></svg>
+                  Large response ({formatSize(bodySize)}) — syntax highlighting disabled for performance
+                  {isTruncated && '. Showing first 500 KB.'}
+                </div>
+              )}
+              <pre
+                ref={bodyRef}
+                className="rounded bg-white/5 font-mono text-xs text-white/80"
+              >
+                <table className="w-full border-collapse">
+                  <tbody>
+                    {formattedLines.map((line, i) => (
+                      <tr key={i} className="leading-5">
+                        <td className="select-none border-r border-white/5 px-3 text-right text-white/20">{i + 1}</td>
+                        <td
+                          className="whitespace-pre-wrap px-3 [overflow-wrap:break-word]"
+                          dangerouslySetInnerHTML={{ __html: line || '&nbsp;' }}
+                        />
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </pre>
+              {isTruncated && (
+                <button
+                  onClick={() => setShowFullBody(true)}
+                  className="mt-2 w-full rounded bg-white/10 py-2 text-xs text-white/60 transition-colors hover:bg-white/15 hover:text-white/80"
+                >
+                  Show full response ({formatSize(bodySize)})
+                </button>
+              )}
+            </div>
           ) : (
             <table className="w-full">
               <thead>

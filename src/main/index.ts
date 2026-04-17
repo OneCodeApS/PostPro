@@ -168,6 +168,8 @@ app.whenReady().then(() => {
   })
   ipcMain.on('window-close', () => mainWindow?.close())
 
+  let activeRequest: Electron.ClientRequest | null = null
+
   ipcMain.handle(
     'http-request',
     async (
@@ -175,29 +177,62 @@ app.whenReady().then(() => {
       opts: { url: string; method: string; headers: Record<string, string>; body?: string }
     ) => {
       const start = Date.now()
-      try {
-        const res = await net.fetch(opts.url, {
-          method: opts.method,
-          headers: opts.headers,
-          body: opts.body ?? undefined
-        })
-        const body = await res.text()
-        const headers: Record<string, string> = {}
-        res.headers.forEach((val, key) => {
-          headers[key] = val
-        })
-        return {
-          status: res.status,
-          statusText: res.statusText,
-          headers,
-          body,
-          time: Date.now() - start
+      return new Promise((resolve) => {
+        let settled = false
+        function settle(result: Record<string, unknown>): void {
+          if (settled) return
+          settled = true
+          activeRequest = null
+          resolve(result)
         }
-      } catch (err) {
-        return { error: err instanceof Error ? err.message : 'Request failed' }
-      }
+
+        const req = net.request({ url: opts.url, method: opts.method })
+        activeRequest = req
+
+        for (const [key, value] of Object.entries(opts.headers)) {
+          req.setHeader(key, value)
+        }
+
+        req.on('response', (res) => {
+          const chunks: Buffer[] = []
+          res.on('data', (chunk) => chunks.push(chunk))
+          res.on('end', () => {
+            const body = Buffer.concat(chunks).toString('utf-8')
+            const headers: Record<string, string> = {}
+            const rawHeaders = res.headers
+            for (const [key, value] of Object.entries(rawHeaders)) {
+              headers[key] = Array.isArray(value) ? value.join(', ') : (value ?? '')
+            }
+            settle({
+              status: res.statusCode,
+              statusText: res.statusMessage,
+              headers,
+              body,
+              time: Date.now() - start
+            })
+          })
+          res.on('error', () => {
+            settle({ error: 'Request cancelled' })
+          })
+        })
+
+        req.on('error', (err) => {
+          settle({ error: err.message || 'Request failed' })
+        })
+
+        req.on('abort', () => {
+          settle({ error: 'Request cancelled' })
+        })
+
+        if (opts.body) req.write(opts.body)
+        req.end()
+      })
     }
   )
+
+  ipcMain.on('abort-request', () => {
+    activeRequest?.abort()
+  })
 
   createWindow()
 

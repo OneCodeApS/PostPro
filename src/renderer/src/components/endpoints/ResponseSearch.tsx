@@ -12,20 +12,25 @@ export function ResponseSearch({ body, bodyRef, onHighlight }: ResponseSearchPro
   const [currentMatch, setCurrentMatch] = useState(0)
   const inputRef = useRef<HTMLInputElement>(null)
 
+  // Skip expensive formatting/searching for very large bodies
+  const isLarge = body.length > 500_000
+
   const formattedBody = useMemo(() => {
+    if (isLarge) return body // skip JSON re-parse for large bodies
     try {
       return JSON.stringify(JSON.parse(body), null, 2)
     } catch {
       return body
     }
-  }, [body])
+  }, [body, isLarge])
 
   const matchCount = useMemo(() => {
     if (!query || !formattedBody) return 0
+    if (isLarge) return 0 // disable search matching for very large bodies
     const escaped = query.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')
     const matches = formattedBody.match(new RegExp(escaped, 'gi'))
     return matches?.length ?? 0
-  }, [query, formattedBody])
+  }, [query, formattedBody, isLarge])
 
   useEffect(() => {
     setCurrentMatch(0)

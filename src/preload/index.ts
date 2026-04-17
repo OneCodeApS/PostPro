@@ -15,6 +15,7 @@ const api = {
     time?: number
     error?: string
   }> => ipcRenderer.invoke('http-request', opts),
+  abortRequest: (): void => ipcRenderer.send('abort-request'),
   checkForUpdates: (): void => ipcRenderer.send('check-for-updates'),
   windowMinimize: (): void => ipcRenderer.send('window-minimize'),
   windowMaximize: (): void => ipcRenderer.send('window-maximize'),

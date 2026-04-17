@@ -46,6 +46,7 @@ export function RequestDetail({
   const [loading, setLoading] = useState(true)
   const [activeTab, setActiveTab] = useState<Tab>('params')
   const [sending, setSending] = useState(false)
+  const cancelledRef = useRef(false)
 
   // Response state backed by TabContext cache
   const cached = requestId ? getResponse(requestId) : { response: null, error: null }
@@ -244,14 +245,22 @@ export function RequestDetail({
     return () => window.removeEventListener('postpro-save-request', handleSaveEvent)
   }, [handleSave, requestId])
 
+  function handleCancel(): void {
+    cancelledRef.current = true
+    window.api.abortRequest()
+    setSending(false)
+  }
+
   async function handleSend(): Promise<void> {
     if (!url.trim()) return
+    cancelledRef.current = false
     setSending(true)
     setResponse(null)
     setResponseError(null)
 
     // Save before sending
     await handleSave()
+    if (cancelledRef.current) return
 
     // Resolve all variables including secrets from vault (walk up parent chain)
     let resolvedVars: { key: string; value: string }[] = []
@@ -274,6 +283,8 @@ export function RequestDetail({
         resolvedVars = await environmentService.getResolvedVariables(envId)
       }
     }
+
+    if (cancelledRef.current) return
 
     // Interpolate variables: replace {varName} with resolved variable values
     function interpolate(text: string): string {
@@ -475,9 +486,15 @@ export function RequestDetail({
             </button>
           )}
           <BoardSearch requestId={requestId!} />
-          <Button variant="tertiary" size="md" onClick={handleSend} disabled={sending}>
-            {sending ? 'Sending...' : 'Send'}
-          </Button>
+          {sending ? (
+            <Button variant="secondary" size="md" onClick={handleCancel}>
+              Cancel..
+            </Button>
+          ) : (
+            <Button variant="tertiary" size="md" onClick={handleSend}>
+              Send
+            </Button>
+          )}
         </div>
 
         {/* Tabs */}

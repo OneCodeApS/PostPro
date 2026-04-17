@@ -17,6 +17,7 @@ declare global {
         time?: number
         error?: string
       }>
+      abortRequest: () => void
       checkForUpdates: () => void
       windowMinimize: () => void
       windowMaximize: () => void
