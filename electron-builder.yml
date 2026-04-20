@@ -24,7 +24,9 @@ win:
     publisherName: Onecode ApS
 nsis:
   oneClick: false
-  allowToChangeInstallationDirectory: true
+  perMachine: true
+  allowElevation: true
+  allowToChangeInstallationDirectory: false
   artifactName: PostPro-setup.${ext}
   shortcutName: PostPro
   uninstallDisplayName: PostPro
