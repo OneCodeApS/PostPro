@@ -70,27 +70,18 @@ export function AuthProvider({ children }: { children: React.ReactNode }): React
       setLoading(false)
     })
 
-    // Proactively refresh session when the app regains focus
-    function handleVisibility(): void {
-      if (document.visibilityState === 'visible') {
-        supabase.auth.refreshSession().catch((err) => {
-          console.error('Session refresh on focus failed:', err)
-        })
-      }
-    }
-    document.addEventListener('visibilitychange', handleVisibility)
-
-    // Safety net: refresh session every 10 minutes regardless of visibility
-    const refreshInterval = setInterval(() => {
-      supabase.auth.refreshSession().catch((err) => {
-        console.error('Periodic session refresh failed:', err)
-      })
-    }, 10 * 60 * 1000)
+    // Drive auth refresh manually. autoRefreshToken is disabled on the client
+    // because its visibilitychange listener hangs in Electron; startAutoRefresh
+    // runs a continuous background loop without that listener.
+    supabase.auth.startAutoRefresh().catch((err) => {
+      console.error('startAutoRefresh failed:', err)
+    })
 
     return () => {
       subscription.unsubscribe()
-      document.removeEventListener('visibilitychange', handleVisibility)
-      clearInterval(refreshInterval)
+      supabase.auth.stopAutoRefresh().catch((err) => {
+        console.error('stopAutoRefresh failed:', err)
+      })
     }
   }, [])
 

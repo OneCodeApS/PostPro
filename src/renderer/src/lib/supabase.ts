@@ -9,6 +9,10 @@ export const supabase = createClient(supabaseUrl, supabaseAnonKey, {
   auth: {
     flowType: 'implicit',
     detectSessionInUrl: false,
+    // Disable built-in auto-refresh: it attaches a visibilitychange listener
+    // that hangs in Electron on focus, which then blocks every subsequent
+    // query. AuthContext runs its own 10-minute refresh interval instead.
+    autoRefreshToken: false,
     lock: async (_name, _acquireTimeout, fn) => await fn()
   }
 })
