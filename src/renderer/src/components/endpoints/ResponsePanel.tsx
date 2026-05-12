@@ -273,13 +273,17 @@ export function ResponsePanel({
                 ref={bodyRef}
                 className="rounded bg-white/5 font-mono text-xs text-white/80"
               >
-                <table className="w-full border-collapse">
+                <table className="w-full table-fixed border-collapse">
+                  <colgroup>
+                    <col className="w-12" />
+                    <col />
+                  </colgroup>
                   <tbody>
                     {formattedLines.map((line, i) => (
                       <tr key={i} className="leading-5">
-                        <td className="select-none border-r border-white/5 px-3 text-right text-white/20">{i + 1}</td>
+                        <td className="select-none border-r border-white/5 px-3 text-right align-top text-white/20">{i + 1}</td>
                         <td
-                          className="whitespace-pre-wrap px-3 [overflow-wrap:break-word]"
+                          className="whitespace-pre-wrap px-3 [overflow-wrap:anywhere] [word-break:break-word]"
                           dangerouslySetInnerHTML={{ __html: line || '&nbsp;' }}
                         />
                       </tr>
