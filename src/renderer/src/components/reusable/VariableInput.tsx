@@ -8,6 +8,15 @@ interface Variable {
   is_secret: boolean
 }
 
+interface HistoryEntry {
+  value: string
+  caret: number
+}
+
+/** Keystrokes closer together than this collapse into one undo step. */
+const COALESCE_MS = 500
+const MAX_HISTORY = 200
+
 interface VariableInputProps {
   value: string
   onChange: (value: string) => void
@@ -16,6 +25,12 @@ interface VariableInputProps {
   className?: string
   multiline?: boolean
   syntax?: 'json'
+  /**
+   * Lets the parent rewrite a paste. Receives the value the field *would* have
+   * after the paste is applied; return a replacement value, or undefined to
+   * paste normally.
+   */
+  transformPastedValue?: (valueAfterPaste: string) => string | undefined
 }
 
 function escapeHtml(text: string): string {
@@ -71,6 +86,18 @@ function highlightJson(text: string, variables?: Variable[]): string {
   return result
 }
 
+/** Offsets of the current selection within `el`, as plain-text character indices. */
+function getSelectionOffsets(el: HTMLElement): { start: number; end: number } {
+  const sel = window.getSelection()
+  if (!sel || sel.rangeCount === 0) return { start: 0, end: 0 }
+  const range = sel.getRangeAt(0)
+  const before = range.cloneRange()
+  before.selectNodeContents(el)
+  before.setEnd(range.startContainer, range.startOffset)
+  const start = before.toString().length
+  return { start, end: start + range.toString().length }
+}
+
 function getCaretOffset(el: HTMLElement): number {
   const sel = window.getSelection()
   if (!sel || sel.rangeCount === 0) return 0
@@ -122,7 +149,8 @@ export function VariableInput({
   placeholder,
   className = '',
   multiline = false,
-  syntax
+  syntax,
+  transformPastedValue
 }: VariableInputProps): React.JSX.Element {
   const highlight = (text: string): string =>
     syntax === 'json' ? highlightJson(text, variables) : highlightVariables(text, variables)
@@ -135,6 +163,68 @@ export function VariableInput({
   const isComposing = useRef(false)
   const skipNextInput = useRef(false)
   const internalValue = useRef(value)
+  const initialised = useRef(false)
+
+  // Re-highlighting rewrites innerHTML on every keystroke, which destroys the
+  // browser's native undo stack for a contenteditable. Keep our own instead.
+  const history = useRef<HistoryEntry[]>([{ value, caret: value.length }])
+  const historyIndex = useRef(0)
+  const lastEditAt = useRef(0)
+  const breakHistory = useRef(false)
+
+  function resetHistory(text: string): void {
+    history.current = [{ value: text, caret: text.length }]
+    historyIndex.current = 0
+    lastEditAt.current = 0
+    breakHistory.current = false
+  }
+
+  function pushHistory(text: string, caret: number): void {
+    const now = Date.now()
+    const entries = history.current
+    // Nothing changed (e.g. a paste whose text was moved elsewhere by the
+    // parent) — don't leave an undo step that appears to do nothing.
+    if (entries[historyIndex.current]?.value === text) return
+    // A fresh edit invalidates anything that was redoable.
+    entries.length = historyIndex.current + 1
+
+    const coalesce =
+      !breakHistory.current && historyIndex.current > 0 && now - lastEditAt.current < COALESCE_MS
+    if (coalesce) {
+      entries[entries.length - 1] = { value: text, caret }
+    } else {
+      entries.push({ value: text, caret })
+      if (entries.length > MAX_HISTORY) entries.shift()
+      historyIndex.current = entries.length - 1
+    }
+    lastEditAt.current = now
+    breakHistory.current = false
+  }
+
+  function restoreHistory(entry: HistoryEntry): void {
+    const el = editorRef.current
+    if (!el) return
+    internalValue.current = entry.value
+    el.innerHTML = entry.value ? highlight(entry.value) : ''
+    setCaretOffset(el, entry.caret)
+    caretRef.current = entry.caret
+    // Don't merge the next keystroke into the entry we just landed on.
+    lastEditAt.current = 0
+    setDropdown(null)
+    onChange(entry.value)
+  }
+
+  function undo(): void {
+    if (historyIndex.current <= 0) return
+    historyIndex.current--
+    restoreHistory(history.current[historyIndex.current])
+  }
+
+  function redo(): void {
+    if (historyIndex.current >= history.current.length - 1) return
+    historyIndex.current++
+    restoreHistory(history.current[historyIndex.current])
+  }
 
   useEffect(() => {
     if (!dropdown) return
@@ -150,9 +240,15 @@ export function VariableInput({
   useEffect(() => {
     const el = editorRef.current
     if (!el) return
-    if (value === internalValue.current && el.innerHTML) return
+    // Tracking "has rendered once" rather than testing el.innerHTML: an emptied
+    // field has falsy innerHTML, which would misread our own edit as an external
+    // one and reset the history — losing the text the user just deleted.
+    if (initialised.current && value === internalValue.current) return
+    initialised.current = true
     internalValue.current = value
     el.innerHTML = value ? highlight(value) : ''
+    // A different request/field is now in this editor — its history isn't ours.
+    resetHistory(value)
   }, [value])
 
   // Re-highlight when variables change (e.g. loaded async) to update tooltips
@@ -186,6 +282,7 @@ export function VariableInput({
     const caret = getCaretOffset(el)
     caretRef.current = caret
     internalValue.current = text
+    pushHistory(text, caret)
     onChange(text)
 
     // Re-highlight and restore caret inline
@@ -211,10 +308,13 @@ export function VariableInput({
     const start = cursorPos - match[0].length
     const end = text.slice(cursorPos).startsWith('}') ? cursorPos + 1 : cursorPos
     const newVal = text.slice(0, start) + `{${key}}` + text.slice(end)
+    internalValue.current = newVal
     onChange(newVal)
     setDropdown(null)
     const newCaret = start + key.length + 2
     caretRef.current = newCaret
+    breakHistory.current = true
+    pushHistory(newVal, newCaret)
     requestAnimationFrame(() => {
       if (editorRef.current) {
         editorRef.current.innerHTML = highlight(newVal)
@@ -232,6 +332,21 @@ export function VariableInput({
       : []
 
   function handleKeyDown(e: React.KeyboardEvent<HTMLDivElement>): void {
+    // Native undo is unusable here (see `history`), so drive it ourselves.
+    if (e.ctrlKey || e.metaKey) {
+      const key = e.key.toLowerCase()
+      if (key === 'z') {
+        e.preventDefault()
+        if (e.shiftKey) redo()
+        else undo()
+        return
+      }
+      if (key === 'y') {
+        e.preventDefault()
+        redo()
+        return
+      }
+    }
     if (e.key === 'Enter') {
       if (dropdown && dropdownMatches.length > 0) {
         e.preventDefault()
@@ -249,6 +364,8 @@ export function VariableInput({
         const newCaret = caret + 1
         caretRef.current = newCaret
         internalValue.current = newText
+        breakHistory.current = true
+        pushHistory(newText, newCaret)
         onChange(newText)
         applyHighlight(newText, newCaret)
       } else {
@@ -285,10 +402,33 @@ export function VariableInput({
 
   function handlePaste(e: React.ClipboardEvent<HTMLDivElement>): void {
     e.preventDefault()
+    // A paste is its own undo step, never merged into surrounding typing.
+    breakHistory.current = true
     const text = e.clipboardData.getData('text/plain')
+    const el = editorRef.current
+
+    if (transformPastedValue && el) {
+      const current = el.textContent ?? ''
+      const { start, end } = getSelectionOffsets(el)
+      const replaced = transformPastedValue(current.slice(0, start) + text + current.slice(end))
+      if (replaced !== undefined) {
+        const caret = replaced.length
+        internalValue.current = replaced
+        el.innerHTML = replaced ? highlight(replaced) : ''
+        setCaretOffset(el, caret)
+        caretRef.current = caret
+        pushHistory(replaced, caret)
+        onChange(replaced)
+        return
+      }
+    }
+
     document.execCommand('insertText', false, text)
   }
 
+  // Single-line content scrolls inside its own box. Without the overflow clip,
+  // `whitespace-pre` text runs past the element and — since the wrapper below is
+  // positioned — paints on top of whatever sits to the right of it.
   return (
     <Tooltip>
     <div className={`relative ${multiline ? 'h-full' : 'min-w-0 flex-1'}`}>
@@ -310,7 +450,7 @@ export function VariableInput({
         }}
         onPaste={handlePaste}
         data-placeholder={placeholder}
-        className={`${className} ${multiline ? 'whitespace-pre-wrap' : 'whitespace-pre'} outline-none empty:before:content-[attr(data-placeholder)] empty:before:text-white/30`}
+        className={`${className} ${multiline ? 'whitespace-pre-wrap' : 'overflow-x-auto whitespace-pre'} outline-none empty:before:content-[attr(data-placeholder)] empty:before:text-white/30`}
       />
 
       {dropdownMatches.length > 0 &&
