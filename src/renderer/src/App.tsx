@@ -10,6 +10,7 @@ import { RequestDetail } from './components/endpoints/RequestDetail'
 import { EnvironmentsPanel } from './components/environments/EnvironmentsPanel'
 import { EnvironmentDetail } from './components/environments/EnvironmentDetail'
 import { DetailPanel } from './components/DetailPanel'
+import { ResizablePanel } from './components/reusable/ResizablePanel'
 
 function LoginPage(): React.JSX.Element {
   const { signInWithMicrosoft } = useAuth()
@@ -79,9 +80,9 @@ function EndpointsRoute(): React.JSX.Element {
 
   return (
     <>
-      <div className="w-64 shrink-0 border-r border-white/10 overflow-hidden">
+      <ResizablePanel storageKey="postpro.panel.endpoints" label="endpoints">
         <EndpointsPanel companyId={companyId} />
-      </div>
+      </ResizablePanel>
       <div className="flex flex-1 flex-col overflow-hidden">
         <TabBar />
         <div className="relative flex-1 overflow-hidden">
