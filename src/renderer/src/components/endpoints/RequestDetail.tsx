@@ -36,6 +36,31 @@ interface KeyValueRow {
   enabled: boolean
 }
 
+function decodeQueryPart(text: string): string {
+  try {
+    return decodeURIComponent(text.replace(/\+/g, ' '))
+  } catch {
+    // Malformed percent-escapes (or a bare `%`) — keep what was pasted.
+    return text
+  }
+}
+
+/** Splits `a=1&b=2` into rows. Pairs without a key are dropped. */
+function parseQueryString(query: string): KeyValueRow[] {
+  return query
+    .split('&')
+    .filter(Boolean)
+    .map((pair) => {
+      const eq = pair.indexOf('=')
+      return {
+        key: decodeQueryPart(eq === -1 ? pair : pair.slice(0, eq)),
+        value: eq === -1 ? '' : decodeQueryPart(pair.slice(eq + 1)),
+        enabled: true
+      }
+    })
+    .filter((row) => row.key)
+}
+
 export function RequestDetail({
   requestId: propRequestId
 }: { requestId?: string } = {}): React.JSX.Element {
@@ -94,6 +119,32 @@ export function RequestDetail({
   }
   function setParamsTracked(v: KeyValueRow[]): void {
     setParams(v)
+  }
+
+  // Pasting a full URL moves its query string into the Params table, since the
+  // URL field holds only the base — handleSend reattaches the params on send.
+  function extractQueryOnPaste(pastedUrl: string): string | undefined {
+    const q = pastedUrl.indexOf('?')
+    if (q === -1) return undefined
+
+    const afterQuestion = pastedUrl.slice(q + 1)
+    const hash = afterQuestion.indexOf('#')
+    const query = hash === -1 ? afterQuestion : afterQuestion.slice(0, hash)
+    const fragment = hash === -1 ? '' : afterQuestion.slice(hash)
+
+    const pasted = parseQueryString(query)
+    if (pasted.length === 0) return undefined
+
+    // Drop blank placeholder rows; a pasted key overwrites the existing one.
+    const merged = params.filter((p) => p.key || p.value)
+    for (const row of pasted) {
+      const existing = merged.findIndex((m) => m.key === row.key)
+      if (existing === -1) merged.push(row)
+      else merged[existing] = row
+    }
+    setParamsTracked(merged)
+
+    return pastedUrl.slice(0, q) + fragment
   }
   function setHeadersTracked(v: KeyValueRow[]): void {
     setHeaders(v)
@@ -440,16 +491,17 @@ export function RequestDetail({
           </div>
 
           {/* URL input with query params preview */}
-          <div className="flex flex-1 items-center rounded bg-white/10 focus-within:bg-white/15">
+          <div className="flex min-w-0 flex-1 items-center rounded bg-white/10 focus-within:bg-white/15">
             <VariableInput
               value={url}
               onChange={setUrlTracked}
+              transformPastedValue={extractQueryOnPaste}
               variables={envVariables}
               placeholder="https://api.example.com/endpoint"
               className="min-w-0 w-full bg-transparent px-3 py-3 text-sm text-white placeholder-white/30 outline-none"
             />
             {params.some((p) => p.enabled && p.key) && (
-              <span className="shrink-0 truncate pr-3 text-xs text-white/30">
+              <span className="min-w-0 max-w-[35%] truncate pr-3 text-xs text-white/30">
                 {(url.includes('?') ? '&' : '?') +
                   params
                     .filter((p) => p.enabled && p.key)
@@ -578,7 +630,9 @@ function KeyValueEditor({
   variables: EnvironmentVariable[]
 }): React.JSX.Element {
   return (
-    <table className="w-full">
+    // table-fixed keeps the columns at their declared widths; with auto layout a
+    // long key or value stretches the table past the panel.
+    <table className="w-full table-fixed">
       <thead>
         <tr className="border-b border-white/10 text-left text-xs text-white/50">
           <th className="w-8 px-4 py-2"></th>

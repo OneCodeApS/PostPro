@@ -241,7 +241,7 @@ export function BodyEditor({ value, onChange, variables }: BodyEditorProps): Rea
         )}
 
         {bodyType === 'form-data' && (
-          <table className="w-full">
+          <table className="w-full table-fixed">
             <thead>
               <tr className="border-b border-white/10 text-left text-xs text-white/50">
                 <th className="w-8 px-4 py-2"></th>

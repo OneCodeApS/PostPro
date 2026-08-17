@@ -39,6 +39,13 @@ export class EnvironmentService {
   }
 
   async delete(id: string): Promise<void> {
+    // Delete variables first so their vault secrets get cleaned up — a cascading
+    // row delete would leave the secrets behind in the vault.
+    const variables = await this.getVariables(id)
+    for (const variable of variables) {
+      await this.deleteVariable(variable.id)
+    }
+
     const { error } = await this.supabase.from('postpro_environments').delete().eq('id', id)
 
     if (error) throw error
@@ -49,6 +56,7 @@ export class EnvironmentService {
       .from('postpro_environment_variables')
       .select('*')
       .eq('environment_id', environmentId)
+      .order('key')
 
     if (error) throw error
     return data

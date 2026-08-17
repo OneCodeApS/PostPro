@@ -1,6 +1,7 @@
 import { HashRouter, Routes, Route, Navigate, Outlet } from 'react-router-dom'
 import { AuthProvider, useAuth } from './contexts/AuthContext'
 import { TabProvider, useTabs } from './contexts/TabContext'
+import { EnvironmentsProvider } from './contexts/EnvironmentsContext'
 import { Sidebar } from './components/Sidebar'
 import { TitleBar } from './components/TitleBar'
 import { TabBar } from './components/endpoints/TabBar'
@@ -108,7 +109,7 @@ function EnvironmentsRoute(): React.JSX.Element {
   return (
     <>
       <div className="w-64 shrink-0 border-r border-white/10 overflow-hidden">
-        <EnvironmentsPanel companyId={companyId} />
+        <EnvironmentsPanel />
       </div>
       <div className="flex-1 overflow-hidden">
         <Outlet />
@@ -172,9 +173,11 @@ function App(): React.JSX.Element {
   return (
     <HashRouter>
       <AuthProvider>
-        <TabProvider>
-          <AppContent />
-        </TabProvider>
+        <EnvironmentsProvider>
+          <TabProvider>
+            <AppContent />
+          </TabProvider>
+        </EnvironmentsProvider>
       </AuthProvider>
     </HashRouter>
   )

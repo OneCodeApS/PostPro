@@ -1,26 +1,25 @@
 import { useEffect, useState } from 'react'
 import { useParams } from 'react-router-dom'
 import { supabase } from '../../lib/supabase'
+import { useEnvironments } from '../../contexts/EnvironmentsContext'
 import { EnvironmentService } from '../../services/EnvironmentService'
 import { Button } from '../reusable/Button'
-import type { Environment, EnvironmentVariable } from '../../types'
+import { Toast, useToast } from '../reusable/Toast'
+import type { EnvironmentVariable } from '../../types'
 
 const environmentService = new EnvironmentService(supabase)
 
 export function EnvironmentDetail(): React.JSX.Element {
   const { environmentId } = useParams<{ environmentId: string }>()
-  const [environment, setEnvironment] = useState<Environment | null>(null)
+  const { environments } = useEnvironments()
+  const environment = environments.find((e) => e.id === environmentId) ?? null
   const [variables, setVariables] = useState<EnvironmentVariable[]>([])
   const [loading, setLoading] = useState(true)
+  const { toast, showToast } = useToast()
 
   async function loadData(): Promise<void> {
     if (!environmentId) return
-    const [envResult, vars] = await Promise.all([
-      supabase.from('postpro_environments').select('*').eq('id', environmentId).single(),
-      environmentService.getVariables(environmentId)
-    ])
-    if (envResult.data) setEnvironment(envResult.data)
-    setVariables(vars)
+    setVariables(await environmentService.getVariables(environmentId))
     setLoading(false)
   }
 
@@ -47,6 +46,7 @@ export function EnvironmentDetail(): React.JSX.Element {
   ): Promise<void> {
     await environmentService.updateVariable(id, updates)
     await loadData()
+    showToast('Saved')
   }
 
   async function handleDeleteVariable(id: string): Promise<void> {
@@ -100,6 +100,7 @@ export function EnvironmentDetail(): React.JSX.Element {
                       await environmentService.makeSecret(v.id, v.value ?? '')
                     }
                     await loadData()
+                    showToast('Saved')
                   }}
                 />
               ))}
@@ -107,6 +108,7 @@ export function EnvironmentDetail(): React.JSX.Element {
           </table>
         )}
       </div>
+      <Toast toast={toast} />
     </div>
   )
 }
