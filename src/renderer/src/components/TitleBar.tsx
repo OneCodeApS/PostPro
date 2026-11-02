@@ -2,7 +2,7 @@ import { useRef, useEffect, useState } from 'react'
 import { useAuth } from '../contexts/AuthContext'
 import { HelpMenu } from './HelpMenu'
 
-type UpdateState = 'idle' | 'available' | 'downloading' | 'ready' | 'error'
+type UpdateState = 'idle' | 'downloading' | 'ready' | 'error'
 
 function UpdateBadge(): React.JSX.Element | null {
   const [state, setState] = useState<UpdateState>('idle')
@@ -12,8 +12,9 @@ function UpdateBadge(): React.JSX.Element | null {
 
   useEffect(() => {
     const off1 = window.api.onUpdateAvailable((info) => {
+      // The main process starts the download automatically.
       setVersion(info.version)
-      setState('available')
+      setState('downloading')
     })
     const off2 = window.api.onUpdateDownloaded(() => {
       setState('ready')
@@ -36,24 +37,10 @@ function UpdateBadge(): React.JSX.Element | null {
 
   if (state === 'idle') return null
 
-  if (state === 'available') {
-    return (
-      <button
-        onClick={() => {
-          setState('downloading')
-          window.api.downloadUpdate()
-        }}
-        className="rounded bg-op-success/20 px-2 py-0.5 text-xs font-medium text-op-success transition-colors hover:bg-op-success/30"
-      >
-        v{version} available
-      </button>
-    )
-  }
-
   if (state === 'downloading') {
     return (
       <span className="rounded bg-white/10 px-2 py-0.5 text-xs text-white/50">
-        Downloading {progress}%
+        Downloading v{version} {progress}%
       </span>
     )
   }
