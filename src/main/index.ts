@@ -236,8 +236,10 @@ app.whenReady().then(() => {
 
   createWindow()
 
-  // Auto-updater
-  autoUpdater.autoDownload = false
+  // Auto-updater: download new versions as soon as they are found and
+  // install them when the app quits, so users cannot stay on an old build.
+  autoUpdater.autoDownload = true
+  autoUpdater.autoInstallOnAppQuit = true
   autoUpdater.checkForUpdates().catch((err) => {
     console.error('Update check failed:', err)
   })
